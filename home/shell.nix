@@ -93,6 +93,7 @@
 
   home.sessionVariables = {
     EDITOR = "nvim";
+    NPM_TOKEN = "";
     PNPM_HOME = "$HOME/Library/pnpm";
   };
 }
