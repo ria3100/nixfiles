@@ -48,8 +48,12 @@ in
     tig
     jj
 
+    # Runtimes
+    nodejs_22
+    pnpm
+    python312
+
     # Dev tools
-    mise
     uv
     rustup
     wasm-pack

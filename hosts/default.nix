@@ -132,10 +132,6 @@
     defaults write com.if.Amphetamine "Show Welcome Window" -bool false
 
     # Dev tools setup
-    if command -v mise &>/dev/null; then
-      sudo -u ria mise install --yes 2>&1 || true
-    fi
-
     if command -v ya &>/dev/null; then
       sudo -u ria ya pkg add yazi-rs/plugins:git 2>/dev/null || true
       sudo -u ria ya pkg add yazi-rs/plugins:no-status 2>/dev/null || true

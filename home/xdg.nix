@@ -8,7 +8,6 @@
     "yazi/theme.toml".source = ../config/yazi/theme.toml;
     "yazi/init.lua".source = ../config/yazi/init.lua;
     "karabiner/karabiner.json".source = ../config/karabiner/karabiner.json;
-    "mise/config.toml".source = ../config/mise/config.toml;
     "starship.toml".source = ../config/starship.toml;
     "nvim" = {
       source = ../config/nvim;

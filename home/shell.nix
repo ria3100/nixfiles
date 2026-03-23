@@ -13,9 +13,6 @@
       # PATH
       export PATH="$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:/Applications/Codex.app/Contents/Resources:$PATH"
 
-      # Tools
-      eval "$(mise activate zsh)"
-
       # Secrets
       [[ -f "$HOME/.secrets" ]] && source "$HOME/.secrets"
 
