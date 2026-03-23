@@ -130,6 +130,38 @@
     defaults write com.if.Amphetamine "Icon Style" -int 6
     defaults write com.if.Amphetamine "Lower Icon Opacity" -bool true
     defaults write com.if.Amphetamine "Show Welcome Window" -bool false
+
+    # Dev tools setup
+    if command -v mise &>/dev/null; then
+      sudo -u ria mise install --yes 2>&1 || true
+    fi
+
+    if command -v ya &>/dev/null; then
+      sudo -u ria ya pkg add yazi-rs/plugins:git 2>/dev/null || true
+      sudo -u ria ya pkg add yazi-rs/plugins:no-status 2>/dev/null || true
+      sudo -u ria ya pkg add sanjinso/monokai-vibrant 2>/dev/null || true
+    fi
+
+    if command -v npm &>/dev/null; then
+      sudo -u ria npm i -g oxlint oxfmt 2>&1 || true
+    fi
+
+    if command -v rustup &>/dev/null; then
+      sudo -u ria rustup default stable 2>&1 || true
+      sudo -u ria rustup target add wasm32-unknown-unknown 2>&1 || true
+    fi
+
+    # Generate .npmrc from Keychain
+    GITHUB_TOKEN=$(sudo -u ria security find-generic-password -s "npm-github-packages" -a "ria" -w 2>/dev/null || echo "")
+    NPM_TOKEN=$(sudo -u ria security find-generic-password -s "npm-registry" -a "ria" -w 2>/dev/null || echo "")
+    if [ -n "$GITHUB_TOKEN" ] || [ -n "$NPM_TOKEN" ]; then
+      NPMRC="/Users/ria/.npmrc"
+      echo "" > "$NPMRC"
+      [ -n "$GITHUB_TOKEN" ] && echo "//npm.pkg.github.com/:_authToken=$GITHUB_TOKEN" >> "$NPMRC"
+      [ -n "$NPM_TOKEN" ] && echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> "$NPMRC"
+      chown ria "$NPMRC"
+      chmod 600 "$NPMRC"
+    fi
   '';
 
   # Primary user (required for homebrew, etc.)
