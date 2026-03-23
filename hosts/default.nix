@@ -165,7 +165,7 @@
 
     # Generate .secrets from Keychain
     SECRETS="/Users/ria/.secrets"
-    echo "" > "$SECRETS"
+    true > "$SECRETS"
     for secret_name in NPM_TOKEN CLAUDE_CODE_OAUTH_TOKEN FIGMA_OAUTH_TOKEN; do
       val=$(sudo -u ria security find-generic-password -s "secret-$secret_name" -a "ria" -w 2>/dev/null || echo "")
       [ -n "$val" ] && echo "export $secret_name=\"$val\"" >> "$SECRETS"
@@ -178,7 +178,7 @@
     NPM_TOKEN=$(sudo -u ria security find-generic-password -s "npm-registry" -a "ria" -w 2>/dev/null || echo "")
     if [ -n "$GITHUB_TOKEN" ] || [ -n "$NPM_TOKEN" ]; then
       NPMRC="/Users/ria/.npmrc"
-      echo "" > "$NPMRC"
+      true > "$NPMRC"
       [ -n "$GITHUB_TOKEN" ] && echo "//npm.pkg.github.com/:_authToken=$GITHUB_TOKEN" >> "$NPMRC"
       [ -n "$NPM_TOKEN" ] && echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> "$NPMRC"
       chown ria "$NPMRC"

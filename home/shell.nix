@@ -32,10 +32,6 @@
         zellij attach "$name" 2>/dev/null || zellij -s "$name" "$@"
       }
 
-      # Cargo
-      [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
-
-      # Vite+ bin (https://viteplus.dev)
     '';
 
     shellAliases = {
