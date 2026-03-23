@@ -16,7 +16,7 @@
         email = "ria000130@gmail.com";
       };
       gpg.ssh.allowedSignersFile = "~/.ssh/allowed_signers";
-      core.editor = ''vim -c "set fenc=utf-8"'';
+      core.editor = ''nvim -c "set fenc=utf-8"'';
       init.defaultBranch = "main";
       pull.rebase = true;
       push.autoSetupRemote = true;

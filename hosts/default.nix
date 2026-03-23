@@ -46,9 +46,7 @@
       "font-udev-gothic-nf"
     ];
 
-    masApps = {
-      Amphetamine = 937984704;
-    };
+    masApps = { };
   };
 
   # macOS system settings
@@ -122,15 +120,6 @@
     defaults write dev.ensan.inputmethod.azooKeyMac "dev.ensan.inputmethod.azooKeyMac.preference.typeHalfSpace" -bool true
     defaults write dev.ensan.inputmethod.azooKeyMac "dev.ensan.inputmethod.azooKeyMac.preference.zenzaiInferenceLimit" -int 1
 
-    # Amphetamine
-    defaults write com.if.Amphetamine "Hide Dock Icon" -bool true
-    defaults write com.if.Amphetamine "Start Session At Launch" -bool true
-    defaults write com.if.Amphetamine "Allow Display Sleep" -bool false
-    defaults write com.if.Amphetamine "Allow Screen Saver" -bool false
-    defaults write com.if.Amphetamine "Icon Style" -int 6
-    defaults write com.if.Amphetamine "Lower Icon Opacity" -bool true
-    defaults write com.if.Amphetamine "Show Welcome Window" -bool false
-
     # Dev tools setup
     if command -v ya &>/dev/null; then
       sudo -u ria ya pkg add yazi-rs/plugins:git 2>/dev/null || true
@@ -145,6 +134,15 @@
     if command -v rustup &>/dev/null; then
       sudo -u ria rustup default stable 2>&1 || true
       sudo -u ria rustup target add wasm32-unknown-unknown 2>&1 || true
+    fi
+
+    # Claude settings (writable copy)
+    CLAUDE_SETTINGS="/Users/ria/.claude/settings.json"
+    CLAUDE_SETTINGS_SRC="${../config/claude/settings.json}"
+    mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+    if [ ! -f "$CLAUDE_SETTINGS" ]; then
+      cp "$CLAUDE_SETTINGS_SRC" "$CLAUDE_SETTINGS"
+      chown ria "$CLAUDE_SETTINGS"
     fi
 
     # SSH keys from Keychain
