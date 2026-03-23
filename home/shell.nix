@@ -7,7 +7,6 @@
     envExtra = ''
       [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
       [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
-      [[ -f "$HOME/.vite-plus/env" ]] && . "$HOME/.vite-plus/env"
     '';
 
     initContent = ''
@@ -40,7 +39,6 @@
       [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
       # Vite+ bin (https://viteplus.dev)
-      [[ -f "$HOME/.vite-plus/env" ]] && . "$HOME/.vite-plus/env"
     '';
 
     shellAliases = {

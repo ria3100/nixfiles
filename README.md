@@ -45,13 +45,6 @@ cd ~/nixfiles
 git remote set-url origin git@github.com:ria3100/nixfiles.git
 ```
 
-### 6. 手動対応
-
-- **Vite+ のインストール**
-  ```sh
-  curl -fsSL https://vite.plus | bash
-  ```
-
 ## Keychain で管理しているシークレット
 
 以下はすべて iCloud Keychain 経由で同期され、`darwin-rebuild switch` 時に自動配置される。
