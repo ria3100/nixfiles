@@ -1,0 +1,26 @@
+#!/bin/bash
+# gf - git files: 差分ファイル一覧 → nvim-remote で開く
+
+GF_PORT=${GF_PORT:-7272}
+
+# バックグラウンドで2秒ごとにリロードを送信
+(sleep 1; while true; do
+  curl -s "localhost:$GF_PORT" -d 'reload(gf-list)' >/dev/null 2>&1 || break
+  sleep 1
+done) &
+GF_WATCH_PID=$!
+trap 'kill $GF_WATCH_PID 2>/dev/null' EXIT
+
+gf-list | fzf \
+  --ansi \
+  --listen "$GF_PORT" \
+  --delimiter="\t" \
+  --with-nth=2 \
+  --padding=0 \
+  --margin=0 \
+  --preview="echo; echo '  '{1}" \
+  --preview-window=bottom:4:wrap:noborder \
+  --no-input \
+  --no-header \
+  --bind="enter:execute-silent(nvim --server /tmp/nvim.sock --remote {1})+reload(gf-list)" \
+  --bind="ctrl-r:reload(gf-list)"

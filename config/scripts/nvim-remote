@@ -1,0 +1,8 @@
+#!/bin/bash
+NVIM_SOCK="/tmp/nvim.sock"
+
+if nvim --server "$NVIM_SOCK" --remote-expr "v:true" 2>/dev/null; then
+  nvim --server "$NVIM_SOCK" --remote "$@"
+else
+  nvim --listen "$NVIM_SOCK" "$@"
+fi

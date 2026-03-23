@@ -1,0 +1,29 @@
+#!/bin/bash
+git status --porcelain -uall | sort -k2 | awk '{
+  status=substr($0,1,2);
+  file=substr($0,4);
+
+  # ファイル名を取得
+  n = split(file, parts, "/");
+  fname = parts[n];
+
+  # 先頭ディレクトリを取得
+  if (n > 3) {
+    short = parts[1] "/…/" parts[n-1] "/" fname;
+  } else if (n == 3) {
+    short = parts[1] "/" parts[2] "/" fname;
+  } else if (n == 2) {
+    short = file;
+  } else {
+    short = fname;
+  }
+
+  if (status=="??") s = "\033[32mN\033[0m";
+  else if (status=="A ") s = "\033[32mA\033[0m";
+  else if (status==" M" || status=="M " || status=="MM" || status=="AM") s = "\033[33mM\033[0m";
+  else if (status==" D" || status=="D ") s = "\033[31mD\033[0m";
+  else if (status=="R " || status=="RM") s = "\033[34mR\033[0m";
+  else s = "\033[35m" substr(status,1,1) "\033[0m";
+
+  printf "%s\t%s %s\n", file, s, short;
+}'

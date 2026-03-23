@@ -16,9 +16,36 @@
     };
   };
 
-  home.file.".vimrc".text = ''
-    set nowrap
-    set number
-    set noswapfile
-  '';
+  home.file = {
+    ".vimrc".text = ''
+      set nowrap
+      set number
+      set noswapfile
+    '';
+
+    # Custom scripts
+    ".local/bin/gf" = {
+      source = ../config/scripts/gf;
+      executable = true;
+    };
+    ".local/bin/gf-list" = {
+      source = ../config/scripts/gf-list;
+      executable = true;
+    };
+    ".local/bin/nvim-remote" = {
+      source = ../config/scripts/nvim-remote;
+      executable = true;
+    };
+
+    # Claude
+    ".claude/settings.json".source = ../config/claude/settings.json;
+    ".claude/CLAUDE.md".source = ../config/claude/CLAUDE.md;
+
+    # Codex
+    ".codex/AGENTS.md".source = ../config/codex/AGENTS.md;
+
+    # Cursor
+    "Library/Application Support/Cursor/User/settings.json".source = ../config/cursor/settings.json;
+    "Library/Application Support/Cursor/User/keybindings.json".source = ../config/cursor/keybindings.json;
+  };
 }
