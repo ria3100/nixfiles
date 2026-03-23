@@ -151,6 +151,32 @@
       sudo -u ria rustup target add wasm32-unknown-unknown 2>&1 || true
     fi
 
+    # SSH keys from Keychain
+    SSH_DIR="/Users/ria/.ssh"
+    mkdir -p "$SSH_DIR"
+    SSH_PRIV=$(sudo -u ria security find-generic-password -s "ssh-id_ed25519_github" -a "ria" -w 2>/dev/null || echo "")
+    SSH_PUB=$(sudo -u ria security find-generic-password -s "ssh-id_ed25519_github-pub" -a "ria" -w 2>/dev/null || echo "")
+    if [ -n "$SSH_PRIV" ] && [ ! -f "$SSH_DIR/id_ed25519_github" ]; then
+      echo "$SSH_PRIV" > "$SSH_DIR/id_ed25519_github"
+      chmod 600 "$SSH_DIR/id_ed25519_github"
+      chown ria "$SSH_DIR/id_ed25519_github"
+    fi
+    if [ -n "$SSH_PUB" ] && [ ! -f "$SSH_DIR/id_ed25519_github.pub" ]; then
+      echo "$SSH_PUB" > "$SSH_DIR/id_ed25519_github.pub"
+      chmod 644 "$SSH_DIR/id_ed25519_github.pub"
+      chown ria "$SSH_DIR/id_ed25519_github.pub"
+    fi
+
+    # Generate .secrets from Keychain
+    SECRETS="/Users/ria/.secrets"
+    echo "" > "$SECRETS"
+    for secret_name in NPM_TOKEN CLAUDE_CODE_OAUTH_TOKEN FIGMA_OAUTH_TOKEN; do
+      val=$(sudo -u ria security find-generic-password -s "secret-$secret_name" -a "ria" -w 2>/dev/null || echo "")
+      [ -n "$val" ] && echo "export $secret_name=\"$val\"" >> "$SECRETS"
+    done
+    chown ria "$SECRETS"
+    chmod 600 "$SECRETS"
+
     # Generate .npmrc from Keychain
     GITHUB_TOKEN=$(sudo -u ria security find-generic-password -s "npm-github-packages" -a "ria" -w 2>/dev/null || echo "")
     NPM_TOKEN=$(sudo -u ria security find-generic-password -s "npm-registry" -a "ria" -w 2>/dev/null || echo "")
