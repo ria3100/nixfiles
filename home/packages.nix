@@ -17,7 +17,6 @@
     direnv
 
     # Shell
-    sheldon
     starship
     zsh-completions
     zellij
@@ -33,7 +32,6 @@
     # Dev tools
     mise
     uv
-    chezmoi
     rustup
     wasm-pack
     cargo-watch
