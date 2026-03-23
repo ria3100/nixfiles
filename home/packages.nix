@@ -1,24 +1,5 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
-let
-  vite-plus = pkgs.stdenv.mkDerivation {
-    pname = "vite-plus";
-    version = "0.1.13";
-    src = pkgs.fetchurl {
-      url = "https://registry.npmjs.org/@voidzero-dev/vite-plus-cli-darwin-arm64/-/vite-plus-cli-darwin-arm64-0.1.13.tgz";
-      sha256 = "sha256-p6gVBCvS1cZSMLuzwYVQ9qHyIhmuvuk+fR/vLu7zBC8=";
-    };
-    sourceRoot = ".";
-    unpackPhase = ''
-      tar xzf $src
-    '';
-    installPhase = ''
-      mkdir -p $out/bin
-      cp package/vp $out/bin/vp
-      chmod +x $out/bin/vp
-    '';
-  };
-in
 {
   home.packages = with pkgs; [
     # Core
@@ -58,9 +39,14 @@ in
     rustup
     wasm-pack
     cargo-watch
-    vite-plus
 
     # Infra
     cloudflared
   ];
+
+  home.activation.installGlobalNpmPackages = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    export PNPM_HOME="$HOME/Library/pnpm"
+    export PATH="$PNPM_HOME:$PATH"
+    ${pkgs.pnpm}/bin/pnpm add -g vite-plus
+  '';
 }

@@ -11,7 +11,7 @@
 
     initContent = ''
       # PATH
-      export PATH="$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:/Applications/Codex.app/Contents/Resources:$PATH"
+      export PATH="$HOME/Library/pnpm:$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:/Applications/Codex.app/Contents/Resources:$PATH"
 
       # Secrets
       [[ -f "$HOME/.secrets" ]] && source "$HOME/.secrets"
@@ -88,9 +88,11 @@
     enable = true;
     enableZshIntegration = true;
     nix-direnv.enable = true;
+    config.global.hide_env_diff = true;
   };
 
   home.sessionVariables = {
     EDITOR = "nvim";
+    PNPM_HOME = "$HOME/Library/pnpm";
   };
 }

@@ -37,7 +37,7 @@
       ".DS_Store"
       ".idea/"
       "node_modules/"
-      ".envrc"
+      ".direnv/"
       ".claude/settings.local.json"
       ".mcp.json"
     ];
