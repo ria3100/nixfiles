@@ -1,0 +1,40 @@
+add_newline = false
+
+format = """\
+  $username\
+  $directory\
+  $git_branch\
+  $nodejs\
+  $rust\
+  $memory_usage\
+  $custom\
+  $line_break\
+  $jobs\
+  $time\
+  $character\
+  """
+
+[character]
+success_symbol = "[❯](bold fg:79)"
+error_symbol = "[❯](bold fg:170)"
+vicmd_symbol = "[❮](bold fg:79)"
+
+[battery]
+disabled = true
+
+[directory]
+truncate_to_repo = false
+
+[git_status]
+disabled = true
+
+[nodejs]
+disabled = true
+
+[rust]
+disabled = true
+
+[time]
+format = '\[[$time]($style)\]'
+
+
