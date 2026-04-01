@@ -40,7 +40,6 @@
       ls = "eza";
       yazi = "yazi --client-id 1";
       codex = "codex --sandbox danger-full-access";
-      claude = "claude --permission-mode auto";
     };
 
     plugins = [
