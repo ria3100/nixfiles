@@ -1,0 +1,5 @@
+# Herdr が起動のたびに mod フォルダへ書き込む生成ファイル
+gpui-kit.d.ts
+herdr.d.ts
+jsconfig.json
+*.error

@@ -29,6 +29,7 @@
       "figma"
       "ghostty"
       "google-chrome"
+      "herdr-app"
       "azookey"
       "karabiner-elements"
       "nani"

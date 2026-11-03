@@ -1,0 +1,10 @@
+{
+  "zoom": 1.0,
+  "sounds": {
+    "enabled": true
+  },
+  "minimum_contrast": 1.0,
+  "appearance": "dark",
+  "font": "UDEV Gothic NFLG",
+  "font_size": 14
+}

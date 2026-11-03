@@ -7,6 +7,7 @@
     ./shell.nix
     ./ssh.nix
     ./xdg.nix
+    ./herdr.nix
   ];
 
   home.stateVersion = "25.05";
