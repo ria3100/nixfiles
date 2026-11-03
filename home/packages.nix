@@ -46,7 +46,7 @@
 
   home.activation.installGlobalNpmPackages = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     export PNPM_HOME="$HOME/Library/pnpm"
-    export PATH="$PNPM_HOME:$PATH"
+    export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
     ${pkgs.pnpm}/bin/pnpm add -g vite-plus
   '';
 }

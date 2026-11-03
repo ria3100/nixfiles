@@ -11,9 +11,9 @@
 
     initContent = ''
       # PATH
-      export PATH="$HOME/Library/pnpm:$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:/Applications/Codex.app/Contents/Resources:$PATH"
+      export PATH="$HOME/Library/pnpm/bin:$HOME/Library/pnpm:$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:$PATH"
 
-      # Secrets
+      # Secrets（NPM_TOKEN など。実値は git 管理外の ~/.secrets に置く）
       [[ -f "$HOME/.secrets" ]] && source "$HOME/.secrets"
 
       # メール通知を無効化
@@ -30,6 +30,16 @@
         )
         local name=''${stars[$RANDOM % ''${#stars[@]} + 1]}
         zellij attach "$name" 2>/dev/null || zellij -s "$name" "$@"
+      }
+
+      # プロジェクトに vite-plus があればそちらの vp を使う（グローバル版とのバージョン不一致を避ける）
+      vp() {
+        local d=$PWD
+        while [[ $d != / ]]; do
+          [[ -x $d/node_modules/.bin/vp ]] && { "$d/node_modules/.bin/vp" "$@"; return }
+          d=''${d:h}
+        done
+        command vp "$@"
       }
 
     '';
@@ -92,7 +102,6 @@
 
   home.sessionVariables = {
     EDITOR = "nvim";
-    NPM_TOKEN = "";
     PNPM_HOME = "$HOME/Library/pnpm";
   };
 }
