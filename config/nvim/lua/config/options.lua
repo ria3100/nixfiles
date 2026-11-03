@@ -60,11 +60,6 @@ vim.api.nvim_create_autocmd({ "VimEnter", "ColorScheme" }, {
     vim.api.nvim_set_hl(0, "SnacksIndent", { fg = "#3a3a3a" })
     vim.api.nvim_set_hl(0, "SnacksIndentScope", { fg = "#4a4a4a" })
 
-    -- Neo-treeのインデントガイドもエディタと同じ色に設定（リンクを解除）
-    vim.api.nvim_set_hl(0, "SnackPickerTree", { fg = "#3a3a3a", default = false })
-    vim.api.nvim_set_hl(0, "NeoTreeIndentMarker", { fg = "#3a3a3a" })
-    vim.api.nvim_set_hl(0, "NeoTreeExpander", { fg = "#3a3a3a" })
-
     -- 行番号と罫線をコメントと同じ薄い色に設定
     vim.api.nvim_set_hl(0, "LineNr", { fg = "#75715e" })
     vim.api.nvim_set_hl(0, "CursorLineNr", { fg = "#75715e" })
