@@ -1,10 +1,29 @@
 {
-  "env": {},
-  "model": "claude-opus-4-6",
-  "permissions": {
-    "default-mode": "auto"
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ENABLE_TOOL_SEARCH": "true"
   },
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "model": "opus",
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "figma@claude-plugins-official": true,
+    "cloudflare@cloudflare": true
+  },
+  "extraKnownMarketplaces": {
+    "cloudflare": {
+      "source": {
+        "source": "github",
+        "repo": "cloudflare/skills"
+      }
+    }
+  },
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "statusLine": {
+    "type": "command",
+    "command": "sh ~/.config/herdr-app/mods/claude-status/statusline.sh --hide-in-herdr"
   }
 }
