@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "herdr-browser": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793488784,
+        "narHash": "sha256-YvlvSl5V8FbkB8AKYzGiyfn1VVege9X9phYTJzn7gck=",
+        "owner": "Abrahamism",
+        "repo": "herdr-browser",
+        "rev": "4aeb831f572f372479108ab02237fdeaf7f93b1b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Abrahamism",
+        "repo": "herdr-browser",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -59,6 +75,7 @@
     },
     "root": {
       "inputs": {
+        "herdr-browser": "herdr-browser",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
         "nixpkgs": "nixpkgs"

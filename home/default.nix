@@ -8,6 +8,7 @@
     ./ssh.nix
     ./xdg.nix
     ./herdr.nix
+    ./herdr-browser.nix
   ];
 
   home.stateVersion = "25.05";

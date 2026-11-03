@@ -13,6 +13,12 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Chromium を CDP で操作する CLI（home/herdr-browser.nix）。flake ではないのでソースだけ取る
+    herdr-browser = {
+      url = "github:Abrahamism/herdr-browser";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ nixpkgs, nix-darwin, home-manager, ... }: {
@@ -25,6 +31,7 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "bak";
+          home-manager.extraSpecialArgs = { inherit inputs; };
           home-manager.users.ria = import ./home;
         }
       ];
