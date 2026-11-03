@@ -8,7 +8,6 @@ export const SCRIPT = [
   "echo @cpu; iostat -n 0 -c 2 -w 1",
   "echo @vm; vm_stat",
   "echo @sys; sysctl -n hw.memsize kern.memorystatus_vm_pressure_level vm.swapusage",
-  "echo @df; df -k /",
   "echo @batt; pmset -g batt",
 ].join("; ");
 
