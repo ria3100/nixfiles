@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, ... }:
 
 {
   xdg.configFile = {
@@ -43,7 +43,28 @@
     ".codex/AGENTS.md".source = ../config/codex/AGENTS.md;
 
     # Cursor
-    "Library/Application Support/Cursor/User/settings.json".source = ../config/cursor/settings.json;
+    # settings.json は home.file で管理しない（下の activation を参照）
     "Library/Application Support/Cursor/User/keybindings.json".source = ../config/cursor/keybindings.json;
   };
+
+  # Cursor はアップデート時に settings.json へ既定値を書き戻す。
+  # Nix ストアへの symlink だと読み取り専用で書き込みに失敗し、
+  # 起動のたびに同じ差分と保存エラーが出続けるため、実ファイルとして配置する。
+  #
+  # 「存在しなければリポジトリの内容をコピーする」挙動なので、
+  # config/cursor/settings.json は初期値（シード）という位置づけになる。
+  # 手元の変更をリポジトリへ戻したい場合は実ファイルを cp してコミットする。
+  home.activation.seedCursorSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    target="$HOME/Library/Application Support/Cursor/User/settings.json"
+
+    # 旧構成（Nix ストアへの symlink）が残っていれば実ファイルへ置き換える
+    if [ -L "$target" ]; then
+      rm -f "$target"
+    fi
+
+    if [ ! -e "$target" ]; then
+      mkdir -p "$(dirname "$target")"
+      install -m 644 ${../config/cursor/settings.json} "$target"
+    fi
+  '';
 }
