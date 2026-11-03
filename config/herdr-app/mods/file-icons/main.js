@@ -1,12 +1,20 @@
 // Herdr's Files panel with VS Code's Material Icon Theme icons: a lazy file browser for the
-// focused pane's folder, with bounded read-only previews.
+// focused pane's folder. Clicking a file opens it in a tab of the nvim whose folder holds it and
+// focuses that pane, or starts nvim in a new tab when there is none. Changed files and the folders
+// above them take their git status color, and a right-click opens a menu (menu.js) of copies and
+// folder actions.
 //
 // Modified from Herdr's shipped `files` mod (https://github.com/herdrdev/herdr-app, Apache-2.0):
-// added DIR, icon() and the Material Icon Theme icons in the rows and the preview header.
+// added DIR, icon() and the Material Icon Theme icons in the rows and the preview header, and
+// openInNvim() (nvim.js) in place of the read-only preview on click, the status colors and the menu.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState } from "gpui-base";
-import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, window } from "herdr";
+import { spaces, panes, focused, exec, props, openOverlay, readTextFile, watchFolder, theme, settings, window } from "herdr";
 import ICONS from "./icons.js";
+import { openInNvim } from "./nvim.js";
+import { Menu, menuItems, menuHeight } from "./menu.js";
+
+// One mod, two roles: the panel, and over the window its right-click menu (props.role "menu").
 
 // Monokai for the file preview.
 const MONOKAI = { keyword: "#f92672", operator: "#f92672", string: "#e6db74", "string.escape": "#ae81ff", comment: "#75715e",
@@ -22,6 +30,7 @@ const key = () => JSON.stringify(location());
 const LANG = { ts: "js", tsx: "js", mts: "js", cts: "js", jsx: "js", mjs: "js", toml: "yaml", jsonc: "json", svelte: "html", vue: "html" };
 const PER_FOLDER = 500, TOTAL = 5000;
 const DIR = "mods/file-icons";
+const URGENCY = ["A", "M", "D", "U"];
 
 // Material Icon Theme's rules, as VS Code applies them: names match case-insensitively; a
 // path rule (".github/workflows") beats a name, a name beats an extension, and the longest
@@ -60,6 +69,7 @@ async function directory(path, on) {
 
 export default class Files extends View {
   init(_props, cx) {
+    if (props()?.role === "menu") { this.menu = new Menu(); this.menu.init(cx); return; }
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
@@ -88,7 +98,7 @@ export default class Files extends View {
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
       this.context = context; this.root = cwd; this.on = on; this.entries = new Map(); this.folders = new Set();
-      this.pending = new Set(); this.marks = {}; this.show(null); this.watched = null; this.error = null; this.limited = false;
+      this.pending = new Set(); this.marks = {}; this.folderMarks = {}; this.show(null); this.watched = null; this.error = null; this.limited = false;
     }
     if (!cwd) return;
     this.loading = true;
@@ -97,17 +107,24 @@ export default class Files extends View {
       try {
         for (const path of ["", ...this.folders]) await this.loadFolder(path, context);
         const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(() => null);
-        const marks = {};
+        const marks = {}, folderMarks = {};
         if (top?.code === 0) {
           // Writes nothing under .git (index lock, fsmonitor cookie): the folder watch would refresh again.
           const status = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=normal"], { cwd, on }).catch(() => null);
           if (status?.code === 0) for (const entry of status.stdout.split("\0").filter(Boolean).slice(0, TOTAL)) {
             const xy = entry.slice(0, 2);
-            marks[`${top.stdout.trim()}/${entry.slice(3)}`] = xy === "??" || xy.includes("A") ? "A" : xy.includes("U") ? "U" : xy.includes("D") ? "D" : "M";
+            // An untracked folder comes as "dir/": it is marked itself, its files inherit it in rows().
+            const root = top.stdout.trim(), path = `${root}/${entry.slice(3).replace(/\/$/, "")}`;
+            const mark = xy === "??" || xy.includes("A") ? "A" : xy.includes("U") ? "U" : xy.includes("D") ? "D" : "M";
+            marks[path] = mark;
+            // As VS Code does, every folder above a change takes the most urgent mark below it.
+            for (let dir = path.slice(0, path.lastIndexOf("/")); dir.length > root.length; dir = dir.slice(0, dir.lastIndexOf("/")))
+              if (URGENCY.indexOf(mark) > URGENCY.indexOf(folderMarks[dir])) folderMarks[dir] = mark;
           }
         }
         if (key() !== context) return;
-        this.marks = marks; this.error = null; this.watch(cwd, cx);
+        this.top = top?.code === 0 ? top.stdout.trim() : null;
+        this.marks = marks; this.folderMarks = folderMarks; this.error = null; this.watch(cwd, cx);
       } catch (e) { if (key() === context) this.error = String(e); }
       finally { this.loading = false; cx.notify(); }
     });
@@ -134,6 +151,18 @@ export default class Files extends View {
     cx.notify();
   }
 
+  openInNvim(path, cx) {
+    const file = `${this.root}/${path}`, on = this.on, folder = this.root;
+    cx.spawn(async () => { await openInNvim(file, { on, folder }); });
+  }
+
+  // Paths relative to the repository root when there is one (as VS Code's workspace), else to the panel's folder.
+  openMenu(path, entry) {
+    const abs = `${this.root}/${path}`, base = this.top && abs.startsWith(this.top + "/") ? this.top : this.root;
+    const target = { abs, rel: abs.slice(base.length + 1), name: entry.name, dir: entry.dir, on: this.on };
+    openOverlay({ mod: "file-icons", kind: "popup", at: "pointer", width: 240, height: menuHeight(menuItems(target)), props: { role: "menu", target } });
+  }
+
   show(path, cx) {
     this.code?.release(); this.code = null; this.file = path; this.fileError = null;
     if (!path || !cx) return;
@@ -154,23 +183,35 @@ export default class Files extends View {
     });
   }
 
+  // Inside a folder git reports as untracked as a whole.
+  untrackedAbove(abs) {
+    for (let dir = abs.slice(0, abs.lastIndexOf("/")); dir.length > (this.root?.length ?? 0); dir = dir.slice(0, dir.lastIndexOf("/")))
+      if (this.marks[dir] === "A") return true;
+    return false;
+  }
+
   rows(prefix, depth, out, t, dark) {
     if (out.length >= TOTAL || depth > 40) return out;
     for (const entry of this.entries.get(prefix) ?? []) {
       if (out.length >= TOTAL) break;
-      const path = prefix ? `${prefix}/${entry.name}` : entry.name, open = this.folders.has(path), mark = this.marks[`${this.root}/${path}`];
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name, open = this.folders.has(path), abs = `${this.root}/${path}`;
+      const own = this.marks[abs] ?? (this.untrackedAbove(abs) ? "A" : undefined);
+      const mark = own ?? (entry.dir ? this.folderMarks?.[abs] : undefined), dot = !own && Boolean(mark);
+      const markColor = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : t.blocked;
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.show(path, cx))
+        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.openInNvim(path, cx))
+        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openMenu(path, entry); })
         .child(entry.dir ? svg(`${DIR}/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(image(icon(path, entry.dir, open, dark)).size(16).flex_none())
-        .child(div().flex_1().min_w(0).truncate().child(entry.name))
-        .when(Boolean(mark), el => el.child(div().text_size(11).text_color(mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : t.blocked).child(mark))));
+        .child(div().flex_1().min_w(0).truncate().when(Boolean(mark), el => el.text_color(markColor)).child(entry.name))
+        .when(Boolean(mark), el => el.child(div().text_size(11).text_color(markColor).child(dot ? "•" : mark))));
       if (entry.dir && open) this.rows(path, depth + 1, out, t, dark);
     }
     return out;
   }
 
   render(cx) {
+    if (this.menu) return this.menu.render(cx);
     if (key() !== this.context) this.refresh(cx);
     const t = theme(), dark = Boolean(settings().dark);
     return v_flex().id("files").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
