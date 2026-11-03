@@ -3,8 +3,8 @@
   "sounds": {
     "enabled": true
   },
-  "minimum_contrast": 1.0,
-  "appearance": "dark",
   "font": "UDEV Gothic NFLG",
-  "font_size": 14
+  "font_size": 14.0,
+  "minimum_contrast": 1.0,
+  "appearance": "dark"
 }
