@@ -27,13 +27,13 @@
                         ]
                     },
                     {
-                        "description": "右Optionキー単押し: 指定アプリ（現在: cmux / bundle: com.cmuxterm.app）がフロントなら直前アプリへ戻る（Cmd+Tab）、それ以外は指定アプリを起動・アクティブ化",
+                        "description": "右Optionキー単押し: 指定アプリ（現在: Herdr / bundle: dev.herdr.app）がフロントなら直前アプリへ戻る（Cmd+Tab）、それ以外は指定アプリを起動・アクティブ化",
                         "manipulators": [
                             {
                                 "conditions": [
                                     {
                                         "type": "frontmost_application_if",
-                                        "bundle_identifiers": ["^com\\.cmuxterm\\.app$"]
+                                        "bundle_identifiers": ["^dev\\.herdr\\.app$"]
                                     }
                                 ],
                                 "from": {
@@ -59,7 +59,7 @@
                                 "conditions": [
                                     {
                                         "type": "frontmost_application_unless",
-                                        "bundle_identifiers": ["^com\\.cmuxterm\\.app$"]
+                                        "bundle_identifiers": ["^dev\\.herdr\\.app$"]
                                     }
                                 ],
                                 "from": {
@@ -74,7 +74,7 @@
                                     }
                                 ],
                                 "to_if_alone": [
-                                    { "shell_command": "/usr/bin/open -a 'cmux'" }
+                                    { "shell_command": "/usr/bin/open -a 'Herdr'" }
                                 ],
                                 "to_if_held_down": [
                                     { "key_code": "right_option" }
