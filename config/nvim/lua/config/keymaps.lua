@@ -22,9 +22,3 @@ vim.keymap.set("v", "<leader>y", function()
   vim.fn.setreg("+", text)
   vim.notify("Copied with location info", vim.log.levels.INFO)
 end, { desc = "Copy with file location" })
-
--- yaziで現在のファイルを表示
-vim.keymap.set("n", "<leader>Y", function()
-  local path = vim.fn.expand("%:p")
-  vim.fn.system('ya emit-to 1 reveal "' .. path .. '"')
-end, { desc = "Reveal in yazi" })

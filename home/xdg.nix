@@ -4,9 +4,6 @@
   xdg.configFile = {
     "ghostty/config".source = ../config/ghostty/config;
     "zellij/config.kdl".source = ../config/zellij/config.kdl;
-    "yazi/yazi.toml".source = ../config/yazi/yazi.toml;
-    "yazi/theme.toml".source = ../config/yazi/theme.toml;
-    "yazi/init.lua".source = ../config/yazi/init.lua;
     "karabiner/karabiner.json".source = ../config/karabiner/karabiner.json;
     "starship.toml".source = ../config/starship.toml;
     "nvim" = {
@@ -21,20 +18,6 @@
       set number
       set noswapfile
     '';
-
-    # Custom scripts
-    ".local/bin/gf" = {
-      source = ../config/scripts/gf;
-      executable = true;
-    };
-    ".local/bin/gf-list" = {
-      source = ../config/scripts/gf-list;
-      executable = true;
-    };
-    ".local/bin/nvim-remote" = {
-      source = ../config/scripts/nvim-remote;
-      executable = true;
-    };
 
     # Claude
     ".claude/CLAUDE.md".source = ../config/claude/CLAUDE.md;

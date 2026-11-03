@@ -122,12 +122,6 @@
     defaults write dev.ensan.inputmethod.azooKeyMac "dev.ensan.inputmethod.azooKeyMac.preference.zenzaiInferenceLimit" -int 1
 
     # Dev tools setup
-    if command -v ya &>/dev/null; then
-      sudo -u ria ya pkg add yazi-rs/plugins:git 2>/dev/null || true
-      sudo -u ria ya pkg add yazi-rs/plugins:no-status 2>/dev/null || true
-      sudo -u ria ya pkg add sanjinso/monokai-vibrant 2>/dev/null || true
-    fi
-
     if command -v npm &>/dev/null; then
       sudo -u ria npm i -g oxlint oxfmt 2>&1 || true
     fi

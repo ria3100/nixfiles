@@ -23,7 +23,6 @@
 
     # Editor
     neovim
-    yazi
 
     # Git
     tig

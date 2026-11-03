@@ -45,10 +45,8 @@
     '';
 
     shellAliases = {
-      vim = "nvim --listen /tmp/nvim.sock";
-      nvim = "nvim --listen /tmp/nvim.sock";
+      vim = "nvim";
       ls = "eza";
-      yazi = "yazi --client-id 1";
       codex = "codex --sandbox danger-full-access";
     };
 
