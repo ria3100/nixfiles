@@ -29,6 +29,7 @@ let
     "tabs-graph"
     "git-graph"
     "file-icons"
+    "git-changes"
     "machine-vitals"
     "claude-status"
     "dev-ports"
