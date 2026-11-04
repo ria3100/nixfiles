@@ -88,7 +88,7 @@ export default class Tabs extends View {
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
     // Changes is shown under Files (layouts/my-main.json), not as a panel of its own.
-    const enabled = [...(shared("workspace.panels") ?? ["files"]).filter(id => id !== "changes"), "graph", "browser"];
+    const enabled = [...(shared("workspace.panels") ?? ["files"]).filter(id => id !== "changes"), "graph"];
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {
       const on = panel && !panel.hidden && body?.active === id;
@@ -107,7 +107,6 @@ export default class Tabs extends View {
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
       .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
       .child(panelButton("graph", "Git", "mods/git-graph/icons/graph.svg"))
-      .child(panelButton("browser", "Browser", "mods/browser-tabs/globe.svg"))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs-graph/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs-graph/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs-graph/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

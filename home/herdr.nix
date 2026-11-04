@@ -39,7 +39,6 @@ let
     "claude-status"
     "dev-ports"
     "spaces-ports"
-    "browser-tabs"
   ];
 in
 {

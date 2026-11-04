@@ -6,7 +6,6 @@
 #
 # - CLI: ソースを flake input から取り、Node で動かすラッパーを PATH に置く
 # - スキル: ~/.claude/skills/herdr-browser（手順をエージェントに教える）
-# - タブ一覧の mod（browser-tabs）は config/herdr-app/mods と home/herdr.nix で管理
 # - TUI 版 herdr 向けのプラグイン部分（herdr-plugin.toml）は GUI 版では使わない
 let
   herdr-browser = pkgs.writeShellScriptBin "herdr-browser" ''

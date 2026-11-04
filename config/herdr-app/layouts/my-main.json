@@ -185,13 +185,6 @@
                       "content": {
                         "mod": "git-graph"
                       }
-                    },
-                    {
-                      "id": "browser",
-                      "type": "block",
-                      "content": {
-                        "mod": "browser-tabs"
-                      }
                     }
                   ],
                   "active": "files"
