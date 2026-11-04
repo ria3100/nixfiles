@@ -2,7 +2,7 @@
 // focused pane's folder. A click opens the file in nvim, as a preview tab, and a double-click keeps
 // that tab (nvim.js); focusing such a tab opens the folders down to its file and marks its row.
 // Changed files and the folders above them take their git status color, and a right-click opens
-// a menu (menu.js) of copies and folder actions.
+// a menu (menu.js) of copies and folder actions. Files git ignores are dimmed.
 //
 // Modified from Herdr's shipped `files` mod (https://github.com/herdrdev/herdr-app, Apache-2.0):
 // added DIR, icon() and the Material Icon Theme icons, nvim (nvim.js) in place of the read-only
@@ -88,10 +88,10 @@ export default class Files extends View {
     if (this.loading) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
-      if (this.context) this.opened.set(this.context, { folders: this.folders, entries: this.entries, marks: this.marks, folderMarks: this.folderMarks, top: this.top });
+      if (this.context) this.opened.set(this.context, { folders: this.folders, entries: this.entries, marks: this.marks, folderMarks: this.folderMarks, ignored: this.ignored, top: this.top });
       const seen = this.opened.get(context);
       this.context = context; this.root = cwd; this.on = on; this.entries = new Map(seen?.entries); this.folders = new Set(seen?.folders);
-      this.pending = new Set(); this.marks = seen?.marks ?? {}; this.folderMarks = seen?.folderMarks ?? {}; this.top = seen?.top ?? null;
+      this.pending = new Set(); this.marks = seen?.marks ?? {}; this.folderMarks = seen?.folderMarks ?? {}; this.ignored = seen?.ignored ?? new Set(); this.top = seen?.top ?? null;
       this.watched = null; this.error = null; this.limited = false;
     }
     if (!cwd) return;
@@ -101,8 +101,12 @@ export default class Files extends View {
       try {
         for (const path of ["", ...this.folders]) await this.loadFolder(path, context);
         const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(() => null);
-        const marks = {}, folderMarks = {};
+        const marks = {}, folderMarks = {}, ignored = new Set();
         if (top?.code === 0) {
+          // Ignored files, and folders ignored as a whole as "dir/" (their contents inherit it in rows()).
+          const root = top.stdout.trim();
+          const listed = await exec("git", ["--no-optional-locks", "ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"], { cwd: root, on }).catch(() => null);
+          if (listed?.code === 0) for (const entry of listed.stdout.split("\0").filter(Boolean).slice(0, TOTAL)) ignored.add(`${root}/${entry.replace(/\/$/, "")}`);
           // Writes nothing under .git (index lock, fsmonitor cookie): the folder watch would refresh again.
           const status = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=normal"], { cwd, on }).catch(() => null);
           if (status?.code === 0) for (const entry of status.stdout.split("\0").filter(Boolean).slice(0, TOTAL)) {
@@ -118,7 +122,7 @@ export default class Files extends View {
         }
         if (key() !== context) return;
         this.top = top?.code === 0 ? top.stdout.trim() : null;
-        this.marks = marks; this.folderMarks = folderMarks; this.error = null; this.watch(cwd, cx);
+        this.marks = marks; this.folderMarks = folderMarks; this.ignored = ignored; this.error = null; this.watch(cwd, cx);
       } catch (e) { if (key() === context) this.error = String(e); }
       finally { this.loading = false; cx.notify(); }
     });
@@ -184,6 +188,14 @@ export default class Files extends View {
     return false;
   }
 
+  // Ignored itself or inside a folder git ignores as a whole.
+  isIgnored(abs) {
+    if (!this.ignored?.size) return false;
+    for (let path = abs; path.length > (this.root?.length ?? 0); path = path.slice(0, path.lastIndexOf("/")))
+      if (this.ignored.has(path)) return true;
+    return false;
+  }
+
   rows(prefix, depth, out, t, dark) {
     if (out.length >= TOTAL || depth > 40) return out;
     for (const entry of this.entries.get(prefix) ?? []) {
@@ -191,13 +203,14 @@ export default class Files extends View {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name, open = this.folders.has(path), abs = `${this.root}/${path}`;
       const own = this.marks[abs] ?? (this.untrackedAbove(abs) ? "A" : undefined);
       const mark = own ?? (entry.dir ? this.folderMarks?.[abs] : undefined), dot = !own && Boolean(mark);
+      const ignored = !mark && this.isIgnored(abs);
       const markColor = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : t.blocked;
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().when(path === this.selected, el => el.bg(t.selected)).hover(s => s.bg(t.hover))
         .on_click((e, cx) => entry.dir ? this.toggle(path, cx) : this.openInNvim(path, e.click_count >= 2, cx))
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openMenu(path, entry); })
         .child(entry.dir ? svg(`${DIR}/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
-        .child(image(icon(path, entry.dir, open, dark)).size(16).flex_none())
-        .child(div().flex_1().min_w(0).truncate().when(Boolean(mark), el => el.text_color(markColor)).child(entry.name))
+        .child(image(icon(path, entry.dir, open, dark)).size(16).flex_none().when(ignored, el => el.opacity(0.6)))
+        .child(div().flex_1().min_w(0).truncate().when(Boolean(mark), el => el.text_color(markColor)).when(ignored, el => el.text_color(t.muted)).child(entry.name))
         .when(Boolean(mark), el => el.child(div().text_size(11).text_color(markColor).child(dot ? "•" : mark))));
       if (entry.dir && open) this.rows(path, depth + 1, out, t, dark);
     }
