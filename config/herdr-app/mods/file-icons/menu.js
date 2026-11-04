@@ -38,7 +38,7 @@ export class Menu {
     const a = it.action;
     if (a.type === "open") {
       // Runs here, then closes: a closed popup's tasks would be cancelled.
-      cx.spawn(async () => { await openInNvim(target.abs, { on: target.on }); closeOverlay(overlay); });
+      cx.spawn(async () => { await openInNvim(target.abs, { on: target.on, folder: target.root }); closeOverlay(overlay); });
       return;
     }
     closeOverlay(overlay);

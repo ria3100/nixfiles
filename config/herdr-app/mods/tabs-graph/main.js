@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
-import { h_flex } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, terminals } from "herdr";
+import { h_flex, v_flex } from "gpui-base";
+import { spaces, panes, run, openOverlay, closeOverlay, theme, window, shared, setShared, layout, settings, terminals, nextCommand, props, exec, hc } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -12,9 +12,13 @@ function find(node, id) {
 }
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
+    if (props()?.role === "confirm") { this.confirm = new Confirm(); this.confirm.init(cx); return; }
     this.pressed = null;
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
+    this.quitting = new Set();
+    // cmd-w (keys.json: "tabs-graph.close").
+    cx.spawn(async () => { for (;;) if (await nextCommand() === "close") closeTab(this.quitting).catch(() => {}); });
   }
 
   // The side panel is remembered per space: switching shows that space's choice
@@ -45,7 +49,13 @@ export default class Tabs extends View {
     localStorage.setItem("panels", JSON.stringify(this.panels));
   }
 
-  render() {
+  // The dialog closed by Herdr (Esc, a layout switch) lets cmd-w through again.
+  async close() {
+    if (this.confirm) setShared(CONFIRMING, null);
+  }
+
+  render(cx) {
+    if (this.confirm) return this.confirm.render(cx);
     const t = theme();
     const space = spaces().find(p => p.active);
     const shown = space?.tabs ?? [];
@@ -53,11 +63,7 @@ export default class Tabs extends View {
     const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
     const item = (c, i) => {
-      const inTab = panes().filter(p => p.tab === c.id);
-      const program = (inTab.find(p => p.program?.agent) ?? inTab.find(p => p.program && p.program.key !== "shell") ?? inTab[0])?.program;
-      // A shell started as `zsh -c "nvim file; exec zsh"` (Files' open in editor) shows as the shell: name the command instead.
-      const command = program?.key === "shell" ? launched(inTab.find(p => p.program === program)) : null;
-      const name = c.named ? c.name : command ?? program?.name ?? c.name;
+      const { name, program, command } = tabName(c);
       return h_flex().id(`tab-${c.id}`).h(29).px(10).gap(7).rounded(7).items_center().flex_none().text_size(12.8)
         .border(1).border_color(c.active ? t.border : t.chrome).bg(c.active ? t.raised : t.chrome).text_color(c.active ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover))
@@ -72,7 +78,7 @@ export default class Tabs extends View {
         .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
         .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
-        .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(12))));
+        .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); closeTab(this.quitting, c.id).catch(() => {}); }).child(svg("mods/pane/close.svg").size(12))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
@@ -107,6 +113,17 @@ export default class Tabs extends View {
   }
 }
 
+// What the tab bar calls a tab: its name if someone named it, else what runs in it.
+function tabName(c) {
+  const inTab = panes().filter(p => p.tab === c.id);
+  const program = (inTab.find(p => p.program?.agent) ?? inTab.find(p => p.program && p.program.key !== "shell") ?? inTab[0])?.program;
+  // A shell started as `zsh -c "nvim file; exec zsh"` (git-changes' open in editor) shows as the shell: name the command instead.
+  const command = program?.key === "shell" ? launched(inTab.find(p => p.program === program)) : null;
+  // A Files nvim (file-icons/nvim.js) titles itself "folder/file".
+  const files = inTab.length === 1 && filesId(inTab[0]) ? inTab[0].title : null;
+  return { name: c.named ? c.name : files || (command ?? program?.name ?? c.name), program, command };
+}
+
 // The command a shell was started to run with -c, e.g. "nvim" from `zsh -l -c "nvim 'a.nix'; exec zsh -l"`.
 function launched(pane) {
   const argv = terminals().find(t => t.address === pane?.terminal)?.argv ?? [];
@@ -114,4 +131,79 @@ function launched(pane) {
   const word = i >= 0 ? String(argv[i + 1] ?? "").trim().split(/[\s;]/)[0] : "";
   const base = word.split("/").pop();
   return base && !/^(\w*sh|exec)$/.test(base) ? base : null;
+}
+
+// A Files nvim's id, from its terminal's argv (file-icons/nvim.js).
+function filesId(pane) {
+  const argv = terminals().find(t => t.address === pane?.terminal)?.argv ?? [];
+  return argv.join(" ").match(/herdr-files-([a-z0-9]+)\.sock/)?.[1] ?? null;
+}
+
+const CONFIRMING = "tabs-graph.confirming";
+const QUIT = `s="\${TMPDIR:-/tmp}/herdr-files-$1.sock"; [ -S "$s" ] || exit 9; nvim --server "$s" --remote-expr "execute('confirm qall')"`;
+
+// cmd-w or the tab's close button (`id`; default the shown tab): a Files nvim gets `:confirm qall` (it asks about unsaved changes, and its
+// tab closes when it exits); shells doing nothing close; anything else running asks first.
+// While nvim asks or the dialog is open, cmd-w on that tab does nothing.
+async function closeTab(quitting, id = null) {
+  const space = spaces().find(s => s.active), tab = space?.tabs.find(t => id ? t.id === id : t.active);
+  if (!tab || quitting.has(tab.id)) return;
+  const asking = shared(CONFIRMING);
+  if (asking?.tab === tab.id && Date.now() - asking.at < 60000) return;
+  const inTab = panes().filter(p => p.tab === tab.id);
+  const nvim = inTab.length === 1 ? filesId(inTab[0]) : null;
+  if (nvim) {
+    quitting.add(tab.id);
+    // nvim asks inside its tab: show it.
+    if (!tab.active) run("tab.select", { id: tab.id });
+    try {
+      // Returns once nvim has its answer; 9: no nvim listening, so handle it as any tab.
+      const r = await exec("sh", ["-c", QUIT, "nvim-quit", nvim], { on: space.machine ?? null }).catch(() => null);
+      if (r?.code !== 9) return;
+    } finally { quitting.delete(tab.id); }
+  }
+  const running = [];
+  for (const pane of inTab) {
+    if (!pane.terminal) { running.push(pane.title || pane.mod || "mod"); continue; }
+    const got = await hc(["get", pane.terminal]).catch(() => null);
+    const info = got?.code === 0 ? JSON.parse(got.stdout) : null;
+    if (!info?.pid || info.foreground?.pid !== info.pid || pane.program?.key !== "shell") running.push(info?.foreground?.name ?? pane.program?.name ?? "program");
+  }
+  if (!running.length) { run("tab.close", { id: tab.id }); return; }
+  setShared(CONFIRMING, { tab: tab.id, at: Date.now() });
+  openOverlay({ mod: "tabs-graph", kind: "dialog", modal: true, width: 380, height: 160,
+    props: { role: "confirm", tab: tab.id, name: tabName(tab).name, running: [...new Set(running)] } });
+}
+
+// The dialog closeTab opens. Only the Close button closes the tab: Enter and Esc cancel, so a
+// repeated cmd-w or Enter can't close it.
+class Confirm {
+  init(cx) {
+    this.handle = cx.focus_handle();
+    this.handle.focus();
+  }
+
+  done(close) {
+    const p = props();
+    setShared(CONFIRMING, null);
+    closeOverlay(p.overlay);
+    if (close) run("tab.close", { id: p.tab });
+  }
+
+  render() {
+    const t = theme(), p = props() ?? {};
+    const button = (id, label, bg, fg, close) => h_flex().id(id).h(32).px(14).items_center().rounded(8).border_1()
+      .border_color(close ? bg : t.input).bg(bg).text_color(fg).cursor_pointer().hover(s => s.opacity(0.88)).on_click(() => this.done(close)).child(label);
+    return v_flex().id("close-tab").track_focus(this.handle).size_full().min_h(0).p(18).gap(12).bg(t.popover).text_size(13)
+      .on_key_down((e, cx) => {
+        if (e.key !== "enter" && e.key !== "escape") return;
+        this.done(false);
+        cx.stop_propagation();
+      })
+      .child(div().text_size(15).font_semibold().text_color(t.foreground).child(`Close ${p.name ?? "tab"}?`))
+      .child(div().flex_1().min_h(0).text_color(t.muted).child(`Still running: ${(p.running ?? []).join(", ")}`))
+      .child(h_flex().justify_end().gap(8).text_size(12)
+        .child(button("no", "Cancel", t.raised, t.foreground, false))
+        .child(button("yes", "Close", t.solid, t.solid_foreground, true)));
+  }
 }

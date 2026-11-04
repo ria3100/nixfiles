@@ -1,6 +1,7 @@
 // Herdr's Files panel with VS Code's Material Icon Theme icons: a lazy file browser for the
-// focused pane's folder. Clicking a file opens it in a tab of the nvim whose folder holds it and
-// focuses that pane, or starts nvim in a new tab when there is none. Changed files and the folders
+// focused pane's folder. Clicking a file opens it in nvim in a Herdr tab of its own, reusing the
+// tab nobody has edited yet as VS Code's preview does; a double-click keeps the tab (nvim.js).
+// Focusing such a tab opens the folders down to its file and marks the file's row. Changed files and the folders
 // above them take their git status color, and a right-click opens a menu (menu.js) of copies and
 // folder actions.
 //
@@ -11,7 +12,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState } from "gpui-base";
 import { spaces, panes, focused, exec, props, openOverlay, readTextFile, watchFolder, theme, settings, window } from "herdr";
 import ICONS from "./icons.js";
-import { openInNvim } from "./nvim.js";
+import { openInNvim, filesId, nvimFile } from "./nvim.js";
 import { Menu, menuItems, menuHeight } from "./menu.js";
 
 // One mod, two roles: the panel, and over the window its right-click menu (props.role "menu").
@@ -20,11 +21,15 @@ import { Menu, menuItems, menuHeight } from "./menu.js";
 const MONOKAI = { keyword: "#f92672", operator: "#f92672", string: "#e6db74", "string.escape": "#ae81ff", comment: "#75715e",
   function: "#a6e22e", type: "#66d9ef", number: "#ae81ff", constant: "#ae81ff", boolean: "#ae81ff", variable: "#f8f8f2", punctuation: "#f8f8f2" };
 
+// While a new tab's pane or its folder isn't known yet, the panel stays where it was.
+let last = null;
 function location() {
   const space = spaces().find(s => s.active), f = focused();
   const pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
+  const unknown = f?.pane ? !pane || (pane.terminal && !pane.cwd) : f && !f.terminal;
+  if (unknown && last) return last;
   const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
-  return { cwd: pane?.cwd || f?.cwd || space?.folder, on };
+  return last = { cwd: pane?.cwd || f?.cwd || space?.folder, on };
 }
 const key = () => JSON.stringify(location());
 const LANG = { ts: "js", tsx: "js", mts: "js", cts: "js", jsx: "js", mjs: "js", toml: "yaml", jsonc: "json", svelte: "html", vue: "html" };
@@ -71,6 +76,8 @@ export default class Files extends View {
   init(_props, cx) {
     if (props()?.role === "menu") { this.menu = new Menu(); this.menu.init(cx); return; }
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
+    // Each place the panel showed: its open folders and listings, shown again at once on coming back.
+    this.opened = new Map();
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
   }
@@ -97,8 +104,11 @@ export default class Files extends View {
     if (this.loading) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
-      this.context = context; this.root = cwd; this.on = on; this.entries = new Map(); this.folders = new Set();
-      this.pending = new Set(); this.marks = {}; this.folderMarks = {}; this.show(null); this.watched = null; this.error = null; this.limited = false;
+      if (this.context) this.opened.set(this.context, { folders: this.folders, entries: this.entries, marks: this.marks, folderMarks: this.folderMarks, top: this.top });
+      const seen = this.opened.get(context);
+      this.context = context; this.root = cwd; this.on = on; this.entries = new Map(seen?.entries); this.folders = new Set(seen?.folders);
+      this.pending = new Set(); this.marks = seen?.marks ?? {}; this.folderMarks = seen?.folderMarks ?? {}; this.top = seen?.top ?? null;
+      this.show(null); this.watched = null; this.error = null; this.limited = false;
     }
     if (!cwd) return;
     this.loading = true;
@@ -136,30 +146,51 @@ export default class Files extends View {
         this.folders.delete(folder);
         this.entries.delete(folder);
       }
-    } else {
-      this.folders.add(path);
-      if (!this.entries.has(path) && !this.pending.has(path)) {
-        const context = this.context;
-        this.pending.add(path);
-        cx.spawn(async cx => {
-          try { await this.loadFolder(path, context); }
-          catch (e) { if (key() === context) this.error = String(e); }
-          finally { this.pending.delete(path); cx.notify(); }
-        });
-      }
-    }
+    } else this.expand(path, cx);
     cx.notify();
   }
 
-  openInNvim(path, cx) {
+  expand(path, cx) {
+    this.folders.add(path);
+    if (this.entries.has(path) || this.pending.has(path)) return;
+    const context = this.context;
+    this.pending.add(path);
+    cx.spawn(async cx => {
+      try { await this.loadFolder(path, context); }
+      catch (e) { if (key() === context) this.error = String(e); }
+      finally { this.pending.delete(path); cx.notify(); }
+    });
+  }
+
+  // The focused pane is a Files nvim: open the folders down to its file and mark it. Again when
+  // its title (folder/file) changes, i.e. nvim moved to another file, or the panel's place does.
+  follow(cx) {
+    const f = focused(), pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
+    const id = pane ? filesId(pane) : null, seen = id ? `${pane.pane}\0${pane.title}\0${this.context}` : null;
+    if (seen === this.following) return;
+    this.following = seen;
+    if (!id) { this.selected = null; return; }
+    const on = this.on;
+    cx.spawn(async cx => {
+      const file = await nvimFile(id, on);
+      if (this.following !== seen || !file || !this.root || !file.startsWith(this.root + "/")) return;
+      const rel = file.slice(this.root.length + 1), parts = rel.split("/");
+      for (let i = 1; i < parts.length; i++) this.expand(parts.slice(0, i).join("/"), cx);
+      this.selected = rel;
+      cx.notify();
+    });
+  }
+
+  // A click opens the preview; a double-click (its second click) keeps the tab.
+  openInNvim(path, pin, cx) {
     const file = `${this.root}/${path}`, on = this.on, folder = this.root;
-    cx.spawn(async () => { await openInNvim(file, { on, folder }); });
+    cx.spawn(async () => { await openInNvim(file, { on, folder, pin }); });
   }
 
   // Paths relative to the repository root when there is one (as VS Code's workspace), else to the panel's folder.
   openMenu(path, entry) {
     const abs = `${this.root}/${path}`, base = this.top && abs.startsWith(this.top + "/") ? this.top : this.root;
-    const target = { abs, rel: abs.slice(base.length + 1), name: entry.name, dir: entry.dir, on: this.on };
+    const target = { abs, rel: abs.slice(base.length + 1), name: entry.name, dir: entry.dir, on: this.on, root: this.root };
     openOverlay({ mod: "file-icons", kind: "popup", at: "pointer", width: 240, height: menuHeight(menuItems(target)), props: { role: "menu", target } });
   }
 
@@ -198,8 +229,8 @@ export default class Files extends View {
       const own = this.marks[abs] ?? (this.untrackedAbove(abs) ? "A" : undefined);
       const mark = own ?? (entry.dir ? this.folderMarks?.[abs] : undefined), dot = !own && Boolean(mark);
       const markColor = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : t.blocked;
-      out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.openInNvim(path, cx))
+      out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().when(path === this.selected, el => el.bg(t.selected)).hover(s => s.bg(t.hover))
+        .on_click((e, cx) => entry.dir ? this.toggle(path, cx) : this.openInNvim(path, e.click_count >= 2, cx))
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openMenu(path, entry); })
         .child(entry.dir ? svg(`${DIR}/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(image(icon(path, entry.dir, open, dark)).size(16).flex_none())
@@ -213,6 +244,7 @@ export default class Files extends View {
   render(cx) {
     if (this.menu) return this.menu.render(cx);
     if (key() !== this.context) this.refresh(cx);
+    this.follow(cx);
     const t = theme(), dark = Boolean(settings().dark);
     return v_flex().id("files").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
