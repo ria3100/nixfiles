@@ -1,15 +1,55 @@
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
+let
+  # starship / zoxide / direnv の初期化スクリプトはビルド時に生成し、起動時は読むだけにする
+  # （毎回 `eval "$(starship init zsh)"` などでコマンドを起動しない）
+  initScript = name: command: pkgs.runCommand "${name}-init.zsh" { } ''
+    HOME=$TMPDIR ${command} > $out
+  '';
+  starshipInit = initScript "starship" "${config.programs.starship.package}/bin/starship init zsh --print-full-init";
+  zoxideInit = initScript "zoxide" "${config.programs.zoxide.package}/bin/zoxide init zsh";
+  direnvInit = initScript "direnv" "${config.programs.direnv.package}/bin/direnv hook zsh";
+in
 {
   programs.zsh = {
     enable = true;
 
+    # 補完の安全確認（compaudit）と .zcompdump の作り直しは、.zcompdump が 24 時間より古いときだけ。
+    # switch で消すので（下の activation）、新しく入れたコマンドの補完はすぐ使える
+    completionInit = ''
+      autoload -U compinit
+      zcompdump_old=(''${ZDOTDIR:-$HOME}/.zcompdump(N.mh+24))
+      if (( $#zcompdump_old )); then
+        compinit
+      else
+        compinit -C
+      fi
+      unset zcompdump_old
+    '';
+
+    # `brew shellenv` の出力と同じ内容を直接書く（zsh を起動するたびに brew を起動しない）。
+    # FPATH は export しない: 子の zsh で fpath が重複するため
     envExtra = ''
-      [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+      typeset -U path fpath
+      if [[ -d /opt/homebrew ]]; then
+        export HOMEBREW_PREFIX=/opt/homebrew HOMEBREW_CELLAR=/opt/homebrew/Cellar HOMEBREW_REPOSITORY=/opt/homebrew
+        path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
+        fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+        [[ -n ''${MANPATH-} ]] && export MANPATH=":''${MANPATH#:}"
+        export INFOPATH="/opt/homebrew/share/info:''${INFOPATH:-}"
+      fi
       [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
     '';
 
-    initContent = ''
+    initContent = lib.mkMerge [
+      (lib.mkOrder 2000 ''
+        if [[ $TERM != "dumb" ]]; then
+          source ${starshipInit}
+        fi
+        source ${zoxideInit}
+        source ${direnvInit}
+      '')
+      ''
       # PATH
       export PATH="$HOME/Library/pnpm/bin:$HOME/Library/pnpm:$HOME/.local/bin:$HOME/.antigravity/antigravity/bin:$PATH"
 
@@ -41,8 +81,8 @@
         done
         command vp "$@"
       }
-
-    '';
+    ''
+    ];
 
     shellAliases = {
       vim = "nvim";
@@ -51,15 +91,6 @@
     };
 
     plugins = [
-      {
-        name = "base16-shell";
-        src = pkgs.fetchFromGitHub {
-          owner = "tinted-theming";
-          repo = "base16-shell";
-          rev = "f0aeff4ae264e72c8dc1315881f204c229e13eec";
-          sha256 = "sha256-Sr4GRbczqQXN/WJDkpwqxpqe10HKPYcvTaXVF30XvEs=";
-        };
-      }
       {
         name = "zsh-autosuggestions";
         src = pkgs.fetchFromGitHub {
@@ -81,22 +112,27 @@
     ];
   };
 
+  # zsh への組み込みは上の initContent（ビルド時に生成したスクリプト）で行う
   programs.starship = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.zoxide = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
   };
 
   programs.direnv = {
     enable = true;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
     nix-direnv.enable = true;
     config.global.hide_env_diff = true;
   };
+
+  home.activation.resetZcompdump = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    run rm -f "$HOME/.zcompdump"
+  '';
 
   home.sessionVariables = {
     EDITOR = "nvim";
