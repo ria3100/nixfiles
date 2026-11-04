@@ -1,6 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, panes, run, openOverlay, closeOverlay, theme, window, shared, setShared, layout, settings, terminals, nextCommand, props, exec, hc } from "herdr";
+import { spaces, panes, run, openOverlay, closeOverlay, theme, window, shared, setShared, layout, settings, terminals, nextCommand, props, hc } from "herdr";
+import { filesId, quitNvim } from "../file-icons/nvim.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -133,18 +134,12 @@ function launched(pane) {
   return base && !/^(\w*sh|exec)$/.test(base) ? base : null;
 }
 
-// A Files nvim's id, from its terminal's argv (file-icons/nvim.js).
-function filesId(pane) {
-  const argv = terminals().find(t => t.address === pane?.terminal)?.argv ?? [];
-  return argv.join(" ").match(/herdr-files-([a-z0-9]+)\.sock/)?.[1] ?? null;
-}
-
 const CONFIRMING = "tabs-graph.confirming";
-const QUIT = `s="\${TMPDIR:-/tmp}/herdr-files-$1.sock"; [ -S "$s" ] || exit 9; nvim --server "$s" --remote-expr "execute('confirm qall')"`;
 
-// cmd-w or the tab's close button (`id`; default the shown tab): a Files nvim gets `:confirm qall` (it asks about unsaved changes, and its
-// tab closes when it exits); shells doing nothing close; anything else running asks first.
-// While nvim asks or the dialog is open, cmd-w on that tab does nothing.
+// cmd-w, or a tab's close button (`id`; default: the shown tab). A Files nvim quits with
+// `:confirm qall` (it asks about unsaved changes; its tab closes as it exits), a tab of shells
+// doing nothing closes, and anything else running asks first. While nvim or the dialog asks,
+// closing that tab again does nothing.
 async function closeTab(quitting, id = null) {
   const space = spaces().find(s => s.active), tab = space?.tabs.find(t => id ? t.id === id : t.active);
   if (!tab || quitting.has(tab.id)) return;
@@ -156,17 +151,15 @@ async function closeTab(quitting, id = null) {
     quitting.add(tab.id);
     // nvim asks inside its tab: show it.
     if (!tab.active) run("tab.select", { id: tab.id });
-    try {
-      // Returns once nvim has its answer; 9: no nvim listening, so handle it as any tab.
-      const r = await exec("sh", ["-c", QUIT, "nvim-quit", nvim], { on: space.machine ?? null }).catch(() => null);
-      if (r?.code !== 9) return;
-    } finally { quitting.delete(tab.id); }
+    try { if (await quitNvim(nvim, space.machine ?? null)) return; }
+    finally { quitting.delete(tab.id); }
   }
   const running = [];
   for (const pane of inTab) {
     if (!pane.terminal) { running.push(pane.title || pane.mod || "mod"); continue; }
     const got = await hc(["get", pane.terminal]).catch(() => null);
     const info = got?.code === 0 ? JSON.parse(got.stdout) : null;
+    // A shell doing nothing is its own foreground process (a program started without a shell is too).
     if (!info?.pid || info.foreground?.pid !== info.pid || pane.program?.key !== "shell") running.push(info?.foreground?.name ?? pane.program?.name ?? "program");
   }
   if (!running.length) { run("tab.close", { id: tab.id }); return; }
