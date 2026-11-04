@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, terminals } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -53,8 +53,11 @@ export default class Tabs extends View {
     const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
     const item = (c, i) => {
-      const program = panes().find(p => p.tab === c.id && p.program?.agent)?.program ?? panes().find(p => p.tab === c.id)?.program;
-      const name = /^tb\d+$/.test(c.name) ? program?.name ?? "Terminal" : c.name;
+      const inTab = panes().filter(p => p.tab === c.id);
+      const program = (inTab.find(p => p.program?.agent) ?? inTab.find(p => p.program && p.program.key !== "shell") ?? inTab[0])?.program;
+      // A shell started as `zsh -c "nvim file; exec zsh"` (Files' open in editor) shows as the shell: name the command instead.
+      const command = program?.key === "shell" ? launched(inTab.find(p => p.program === program)) : null;
+      const name = c.named ? c.name : command ?? program?.name ?? c.name;
       return h_flex().id(`tab-${c.id}`).h(29).px(10).gap(7).rounded(7).items_center().flex_none().text_size(12.8)
         .border(1).border_color(c.active ? t.border : t.chrome).bg(c.active ? t.raised : t.chrome).text_color(c.active ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover))
@@ -65,7 +68,7 @@ export default class Tabs extends View {
           else run("tab.select", { id: c.id });
         })
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "menu", kind: "popup", width: 200, props: { tab: "tab", target: { id: c.id, space: space.id } } }); })
-        .when(Boolean(program?.icon), el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
+        .when(Boolean(program?.icon) && !command, el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
         .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
         .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
@@ -102,4 +105,13 @@ export default class Tabs extends View {
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs-graph/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs-graph/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));
   }
+}
+
+// The command a shell was started to run with -c, e.g. "nvim" from `zsh -l -c "nvim 'a.nix'; exec zsh -l"`.
+function launched(pane) {
+  const argv = terminals().find(t => t.address === pane?.terminal)?.argv ?? [];
+  const i = argv.lastIndexOf("-c");
+  const word = i >= 0 ? String(argv[i + 1] ?? "").trim().split(/[\s;]/)[0] : "";
+  const base = word.split("/").pop();
+  return base && !/^(\w*sh|exec)$/.test(base) ? base : null;
 }
