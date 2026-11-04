@@ -12,6 +12,9 @@ import { parseLsof, parsePs, attribute, versionUrl, isDebugger } from "./ports.j
 
 const EVERY = 5000;
 const AWAY = 30000;
+// A scan whose command never answers is given up after this: the next one starts, and the
+// stuck one's result is dropped (it would otherwise keep the bar on old ports for good).
+const STUCK = 20000;
 
 export default class DevPorts extends View {
   init(_props, cx) {
@@ -45,7 +48,8 @@ export default class DevPorts extends View {
   }
 
   scan(cx) {
-    if (this.busy) return;
+    if (this.busy && Date.now() - this.last < STUCK) return;
+    const run = this.run = (this.run ?? 0) + 1;
     this.busy = true;
     this.last = Date.now();
     cx.spawn(async (cx) => {
@@ -56,13 +60,14 @@ export default class DevPorts extends View {
         ]);
         const found = attribute(parseLsof(lsof.stdout), parsePs(ps.stdout), await this.roots());
         await this.classify(found);
+        if (run !== this.run) return;
         const servers = found.map((s) => ({ ...s,
           ports: s.ports.map((p) => ({ port: p.port, debug: this.debug.get(`${p.pid}:${p.port}`) === true })) }));
         const key = JSON.stringify(servers);
         if (key !== this.key) { this.key = key; this.servers = servers; cx.notify(); }
         this.publish();
       } catch {} finally {
-        this.busy = false;
+        if (run === this.run) this.busy = false;
       }
     });
   }
