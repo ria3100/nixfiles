@@ -13,11 +13,14 @@
 # Herdr は mod のフォルダ外のモジュールを import できないため、mod 間で共有する
 # JS は file-icons に置いて各 mod から symlink し、コピー時に実体にする（--copy-links）。
 # Herdr が起動のたびに書き込む *.d.ts / jsconfig.json はコピー先に残す。
+# hydln（~/app/hydln、Herdr のフォーク）のホーム ~/.config/hydln があれば、
+# そこの mods/ にも同じようにコピーする。
 #
 # AGENTS.md・*.d.ts・frame/・icons/・同梱の mod とレイアウト
 # （main / terminals / win98 など）は Herdr が毎回書き直すので管理しない。
 let
   repo = "${config.home.homeDirectory}/nixfiles/config/herdr-app";
+  hydlnHome = "${config.xdg.configHome}/hydln";
   link = path: config.lib.file.mkOutOfStoreSymlink "${repo}/${path}";
 
   files = [
@@ -45,18 +48,23 @@ in
   });
 
   home.activation.syncHerdrMods = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    mods_dir="${config.xdg.configHome}/herdr-app/mods"
-    mkdir -p "$mods_dir"
-    for mod in ${lib.escapeShellArgs mods}; do
-      target="$mods_dir/$mod"
-      # 旧構成（symlink）が残っていれば実フォルダへ置き換える
-      if [ -L "$target" ]; then
-        rm -f "$target"
-      fi
-      run ${pkgs.rsync}/bin/rsync -a --copy-links --delete \
-        --exclude 'gpui-kit.d.ts' --exclude 'herdr.d.ts' \
-        --exclude 'jsconfig.json' --exclude '*.error' \
-        "${repo}/mods/$mod/" "$target/"
+    mods_dirs="${config.xdg.configHome}/herdr-app/mods"
+    if [ -d "${hydlnHome}" ]; then
+      mods_dirs="$mods_dirs ${hydlnHome}/mods"
+    fi
+    for mods_dir in $mods_dirs; do
+      mkdir -p "$mods_dir"
+      for mod in ${lib.escapeShellArgs mods}; do
+        target="$mods_dir/$mod"
+        # 旧構成（symlink）が残っていれば実フォルダへ置き換える
+        if [ -L "$target" ]; then
+          rm -f "$target"
+        fi
+        run ${pkgs.rsync}/bin/rsync -a --copy-links --delete \
+          --exclude 'gpui-kit.d.ts' --exclude 'herdr.d.ts' \
+          --exclude 'jsconfig.json' --exclude '*.error' \
+          "${repo}/mods/$mod/" "$target/"
+      done
     done
   '';
 }
