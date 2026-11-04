@@ -9,24 +9,14 @@
 // preview, following the focused nvim, the status colors and the menu.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, panes, focused, exec, props, openOverlay, watchFolder, theme, settings, window } from "herdr";
+import { exec, props, openOverlay, watchFolder, theme, settings, window } from "herdr";
 import ICONS from "./icons.js";
-import { openInNvim, filesId, nvimFile } from "./nvim.js";
+import { openInNvim, focusedNvim, nvimFile } from "./nvim.js";
+import { location, placeKey as key } from "./location.js";
 import { Menu, menuItems, menuHeight } from "./menu.js";
 
 // One mod, two roles: the panel, and over the window its right-click menu (props.role "menu").
 
-// While a new tab's pane or its folder isn't known yet, the panel stays where it was.
-let last = null;
-function location() {
-  const space = spaces().find(s => s.active), f = focused();
-  const pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
-  const unknown = f?.pane ? !pane || (pane.terminal && !pane.cwd) : f && !f.terminal;
-  if (unknown && last) return last;
-  const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
-  return last = { cwd: pane?.cwd || f?.cwd || space?.folder, on };
-}
-const key = () => JSON.stringify(location());
 const PER_FOLDER = 500, TOTAL = 5000;
 const DIR = "mods/file-icons";
 const URGENCY = ["A", "M", "D", "U"];
@@ -159,14 +149,13 @@ export default class Files extends View {
   // The focused pane is a Files nvim: open the folders down to its file and mark it. Again when
   // its title (folder/file) changes, i.e. nvim moved to another file, or the panel's place does.
   follow(cx) {
-    const f = focused(), pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
-    const id = pane ? filesId(pane) : null, seen = id ? `${pane.pane}\0${pane.title}\0${this.context}` : null;
+    const nvim = focusedNvim(), seen = nvim ? `${nvim.seen}\0${this.context}` : null;
     if (seen === this.following) return;
     this.following = seen;
-    if (!id) { this.selected = null; return; }
+    if (!nvim) { this.selected = null; return; }
     const on = this.on;
     cx.spawn(async cx => {
-      const file = await nvimFile(id, on);
+      const file = await nvimFile(nvim.id, on);
       if (this.following !== seen || !file || !this.root || !file.startsWith(this.root + "/")) return;
       const rel = file.slice(this.root.length + 1), parts = rel.split("/");
       for (let i = 1; i < parts.length; i++) this.expand(parts.slice(0, i).join("/"), cx);

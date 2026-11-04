@@ -1,49 +1,22 @@
 // VS Code's Source Control "Changes" for the focused pane's repository: changed files in
 // Merge Changes / Staged Changes / Changes, each with its Material Icon Theme icon (borrowed
-// from the file-icons mod), name, folder and status letter. Clicking a file opens it in a tab of
-// the nvim whose folder holds it, or starts nvim in a new tab, and shows its diff with fugitive:
-// a staged file as the index against HEAD, an unstaged one as the working file against the index.
+// from the file-icons mod), name, folder and status letter. A click opens the file in nvim as
+// the Files panel does (file-icons/nvim.js: a preview tab, kept on a double-click) and shows its
+// diff with fugitive: a staged file as the index against HEAD, an unstaged one as the working
+// file against the index. The focused nvim's file is marked.
 import { View, div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, panes, focused, exec, hc, run, watchFolder, theme, settings } from "herdr";
+import { exec, watchFolder, theme, settings } from "herdr";
 import ICONS from "./icons.js";
+import { openInNvim, focusedNvim, nvimFile } from "./nvim.js";
+import { location, placeKey as key } from "./location.js";
 
 const ICON_DIR = "mods/file-icons";
 const LIMIT = 2000;
 
-// Runs the vim expression ($1) in the first nvim whose process descends from one of the
-// terminal pids that follow, tried in order, and prints that pid. Exits 1 when none runs nvim.
-const NVIM_RUN = `
-expr=$1; shift
-for want in "$@"; do
-  for s in "\${TMPDIR:-/tmp}"/nvim."$USER"/*/nvim.*.0; do
-    [ -S "$s" ] || continue
-    pid=\${s##*/nvim.}; pid=\${pid%.0}
-    for _ in 1 2 3 4; do
-      if [ "$pid" = "$want" ]; then
-        nvim --server "$s" --remote-expr "$expr" >/dev/null && echo "$want" && exit 0
-        break
-      fi
-      pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
-      [ -n "$pid" ] || break
-    done
-  done
-done
-exit 1
-`;
-
-const shellQuote = text => `'${text.replaceAll("'", `'\\''`)}'`;
 const vimString = text => `'${text.replaceAll("'", "''")}'`;
 // Reads write nothing under .git (no index lock, no fsmonitor cookie): the folder watch would see it.
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false"];
-
-function location() {
-  const space = spaces().find(s => s.active), f = focused();
-  const pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
-  const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
-  return { cwd: pane?.cwd || f?.cwd || space?.folder, on };
-}
-const key = () => JSON.stringify(location());
 
 // Material Icon Theme's rules, as the file-icons mod applies them (files only).
 function lookup(table, name, dark) { return (dark ? undefined : ICONS.light[table][name]) ?? ICONS[table][name]; }
@@ -93,6 +66,8 @@ function diffCommands(file) {
 export default class GitChanges extends View {
   init(_props, cx) {
     this.groups = [];
+    // Each place's list, shown again at once on coming back.
+    this.seen = new Map();
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
   }
@@ -110,7 +85,9 @@ export default class GitChanges extends View {
     if (this.loading) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
-      this.context = context; this.on = on; this.top = null; this.groups = []; this.error = null; this.watched = null;
+      if (this.context) this.seen.set(this.context, { top: this.top, groups: this.groups });
+      const seen = this.seen.get(context);
+      this.context = context; this.on = on; this.top = seen?.top ?? null; this.groups = seen?.groups ?? []; this.error = null; this.watched = null;
     }
     if (!cwd) return;
     this.loading = true;
@@ -130,41 +107,33 @@ export default class GitChanges extends View {
     });
   }
 
-  // Opens the file in a tab of the nvim whose folder holds it (this space's first, the deepest
-  // folder first) and focuses its pane; with none, in a new tab whose shell runs nvim.
-  open(file, cx) {
-    const top = this.top, on = this.on, abs = `${top}/${file.path}`, space = spaces().find(s => s.active);
-    const commands = diffCommands(file);
-    const here = new Set(space?.tabs.map(t => t.id) ?? []);
-    const candidates = panes().filter(p => p.terminal && p.cwd && abs.startsWith(p.cwd.replace(/\/$/, "") + "/"))
-      .sort((a, b) => Number(here.has(b.tab)) - Number(here.has(a.tab)) || b.cwd.length - a.cwd.length);
-    const expr = `execute(['tab drop ' . fnameescape(${vimString(abs)}), 'silent! only'${commands.map(c => `, ${vimString(c)}`).join("")}])`;
-    cx.spawn(async () => {
-      const pids = new Map();
-      for (const pane of candidates) {
-        const got = await hc(["get", pane.terminal]).catch(() => null);
-        const pid = got?.code === 0 ? JSON.parse(got.stdout).pid : null;
-        if (pid) pids.set(String(pid), pane);
-      }
-      const ran = pids.size ? await exec("sh", ["-c", NVIM_RUN, "nvim-run", expr, ...pids.keys()], { on }).catch(() => null) : null;
-      const pane = ran?.code === 0 ? pids.get(ran.stdout.trim()) : null;
-      if (!pane) {
-        const args = [shellQuote(abs), ...commands.map(c => `-c ${shellQuote(c)}`)].join(" ");
-        run("tab.new", { space: space?.id, folder: top, argv: ["/bin/zsh", "-l", "-c", `nvim ${args}; exec /bin/zsh -l`] });
-        return;
-      }
-      const owner = spaces().find(s => s.tabs.some(t => t.id === pane.tab));
-      if (owner) run("space.select", { id: owner.id });
-      run("tab.select", { id: pane.tab });
-      run("pane.focus", { pane: pane.pane });
+  // A click opens the preview; a double-click (its second click) keeps the tab.
+  open(file, pin, cx) {
+    const top = this.top, on = this.on;
+    cx.spawn(async () => { await openInNvim(`${top}/${file.path}`, { on, folder: top, pin, commands: diffCommands(file) }); });
+  }
+
+  // Marks the focused Files nvim's file, again when it moves to another file.
+  follow(cx) {
+    const nvim = focusedNvim(), seen = nvim ? `${nvim.seen}\0${this.context}` : null;
+    if (seen === this.following) return;
+    this.following = seen;
+    if (!nvim) { this.selected = null; return; }
+    const on = this.on;
+    cx.spawn(async cx => {
+      const file = await nvimFile(nvim.id, on);
+      if (this.following !== seen) return;
+      this.selected = file;
+      cx.notify();
     });
   }
 
   row(file, t, dark) {
     const slash = file.path.lastIndexOf("/"), name = file.path.slice(slash + 1), folder = slash < 0 ? "" : file.path.slice(0, slash);
     const color = file.letter === "A" || file.letter === "U" ? t.ansi2 : file.letter === "D" || file.letter === "!" ? t.ansi1 : t.blocked;
-    return h_flex().id(`change-${file.group}-${file.path}`).h(26).flex_none().pl(14).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-      .on_click((_e, cx) => this.open(file, cx))
+    return h_flex().id(`change-${file.group}-${file.path}`).h(26).flex_none().pl(14).pr(8).gap(7).items_center().rounded(7).cursor_pointer()
+      .when(`${this.top}/${file.path}` === this.selected, el => el.bg(t.selected)).hover(s => s.bg(t.hover))
+      .on_click((e, cx) => this.open(file, e.click_count >= 2, cx))
       .child(image(icon(file.path, dark)).size(16).flex_none())
       .child(h_flex().flex_1().min_w(0).gap(6).items_center()
         .child(div().flex_none().max_w_full().truncate().child(name))
@@ -174,6 +143,7 @@ export default class GitChanges extends View {
 
   render(cx) {
     if (key() !== this.context) this.refresh(cx);
+    this.follow(cx);
     const t = theme(), dark = Boolean(settings().dark);
     const total = this.groups.reduce((n, g) => n + g.files.length, 0);
     const list = [];

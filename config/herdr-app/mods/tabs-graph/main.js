@@ -1,7 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { spaces, panes, run, openOverlay, closeOverlay, theme, window, shared, setShared, layout, settings, terminals, nextCommand, props, hc } from "herdr";
-import { filesId, quitNvim } from "../file-icons/nvim.js";
+import { filesId, quitNvim } from "./nvim.js";
 
 function find(node, id) {
   if (node?.id === id) return node;

@@ -10,6 +10,8 @@
 # mod: Herdr は symlink 越しの mod フォルダから JS は読めるが、SVG や画像は
 # 読み込まない（アイコンが消える）。そのため switch のたびにリポジトリから
 # 実フォルダへコピーする。mod を直すときはリポジトリを編集して switch する。
+# Herdr は mod のフォルダ外のモジュールを import できないため、mod 間で共有する
+# JS は file-icons に置いて各 mod から symlink し、コピー時に実体にする（--copy-links）。
 # Herdr が起動のたびに書き込む *.d.ts / jsconfig.json はコピー先に残す。
 #
 # AGENTS.md・*.d.ts・frame/・icons/・同梱の mod とレイアウト
@@ -51,7 +53,7 @@ in
       if [ -L "$target" ]; then
         rm -f "$target"
       fi
-      run ${pkgs.rsync}/bin/rsync -a --delete \
+      run ${pkgs.rsync}/bin/rsync -a --copy-links --delete \
         --exclude 'gpui-kit.d.ts' --exclude 'herdr.d.ts' \
         --exclude 'jsconfig.json' --exclude '*.error' \
         "${repo}/mods/$mod/" "$target/"
