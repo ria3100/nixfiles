@@ -5,14 +5,17 @@
 // nobody has edited yet (the preview) is reused for the next file; a double-click keeps (pins) it.
 // These "Files nvims" are started with --listen on ${TMPDIR:-/tmp}/herdr-files-<id>.sock (their
 // terminal's argv carries the id) and with SETUP: a "folder/file" title for the tab name, and
-// g:herdr_edited once anything was changed, which keeps the tab. The tab closes when nvim exits.
+// g:herdr_edited once anything was changed, which keeps the tab. Until then the title starts with
+// PREVIEW, an invisible mark tabs-graph shows as italics. The tab closes when nvim exits.
 import { spaces, panes, focused, terminals, exec, run } from "herdr";
 
+export const PREVIEW = "\u200b";
+// Setting titlestring again redraws the title, without the mark once edited.
+const PIN = "let g:herdr_edited = 1 | let &titlestring = &titlestring";
 const SETUP = [
-  "set title titlestring=%{expand('%:p:h:t')}/%t",
-  "autocmd BufModifiedSet * if &modified | let g:herdr_edited = 1 | endif",
+  "set title titlestring=%{get(g:,'herdr_edited',0)?'':nr2char(0x200b)}%{expand('%:p:h:t')}/%t",
+  `autocmd BufModifiedSet * if &modified | ${PIN} | endif`,
 ];
-const PIN = "let g:herdr_edited = 1";
 // Deletes the listed buffers other than the current one (a preview's earlier files; none is modified).
 const DROP_OTHERS = "lua for _, b in ipairs(vim.api.nvim_list_bufs()) do if b ~= vim.api.nvim_get_current_buf() and vim.bo[b].buflisted and not vim.bo[b].modified then pcall(vim.api.nvim_buf_delete, b, {}) end end";
 
@@ -89,8 +92,9 @@ async function open(file, { on = null, folder, pin = false, commands = [] } = {}
   const id = Math.random().toString(36).slice(2, 10);
   const startup = pin ? [...SETUP, PIN] : SETUP;
   const args = ["--listen", `"\${TMPDIR:-/tmp}/herdr-files-${id}.sock"`, ...startup.flatMap(c => ["-c", shellString(c)]), "--", shellString(file)];
-  // Herdr runs argv in a shell that stays after it: hang that shell up so the tab closes with nvim.
-  run("tab.new", { space: space?.id, folder: folder ?? file.slice(0, file.lastIndexOf("/")), argv: ["/bin/zsh", "-l", "-c", `nvim ${args.join(" ")}; kill -HUP $PPID`] });
+  // Herdr runs argv in an interactive login shell that stays after it: hang that shell up so the tab
+  // closes with nvim. That shell has set the environment up, so a plain sh is enough in between.
+  run("tab.new", { space: space?.id, folder: folder ?? file.slice(0, file.lastIndexOf("/")), argv: ["/bin/sh", "-c", `nvim ${args.join(" ")}; kill -HUP $PPID`] });
   // Until it answers (3s at most), so the next open finds it. The commands go then, not with -c:
   // plugins nvim loads lazily (fugitive) aren't there yet at startup.
   for (let i = 0; i < 30 && (await remote(id, "1", on))?.code !== 0; i++) await exec("sleep", ["0.1"]).catch(() => null);
