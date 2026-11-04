@@ -128,6 +128,9 @@ in
     enableZshIntegration = false;
     nix-direnv.enable = true;
     config.global.hide_env_diff = true;
+    # Herdr の worktree mod が作る worktree の .envrc は自動で許可する（作るたびの direnv allow を不要にする）。
+    # ~/tricot/*-worktrees は parallel-worktree スキル（wt-dev）が作成時に allow する
+    config.whitelist.prefix = [ "${config.home.homeDirectory}/.herdr/worktrees" ];
   };
 
   home.activation.resetZcompdump = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
