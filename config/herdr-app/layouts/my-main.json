@@ -152,17 +152,32 @@
                   "children": [
                     {
                       "id": "files",
-                      "type": "block",
-                      "content": {
-                        "mod": "file-icons"
-                      }
-                    },
-                    {
-                      "id": "changes",
-                      "type": "block",
-                      "content": {
-                        "mod": "git-changes"
-                      }
+                      "type": "column",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "id": "files-tree",
+                          "type": "block",
+                          "content": {
+                            "mod": "file-icons"
+                          },
+                          "size": {
+                            "weight": 3
+                          },
+                          "min": 120
+                        },
+                        {
+                          "id": "files-changes",
+                          "type": "block",
+                          "content": {
+                            "mod": "git-changes"
+                          },
+                          "size": {
+                            "weight": 1
+                          },
+                          "min": 80
+                        }
+                      ]
                     },
                     {
                       "id": "graph",
