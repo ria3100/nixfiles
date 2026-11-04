@@ -5,6 +5,9 @@
 -- CursorHold の発火を速くする
 vim.opt.updatetime = 200
 
+-- swap ファイルを作らない（未保存のまま閉じる前の確認は :confirm に任せる）
+vim.opt.swapfile = false
+
 -- h/lで行をまたいで移動
 vim.opt.whichwrap:append("h,l,<,>,[,]")
 
