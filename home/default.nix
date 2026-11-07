@@ -9,6 +9,7 @@
     ./xdg.nix
     ./herdr.nix
     ./herdr-browser.nix
+    ./zed.nix
   ];
 
   home.stateVersion = "25.05";

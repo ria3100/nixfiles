@@ -66,7 +66,7 @@
           "id": "machine-vitals",
           "type": "block",
           "size": {
-            "px": 80
+            "px": 100
           },
           "content": {
             "mod": "machine-vitals"

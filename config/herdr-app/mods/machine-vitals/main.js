@@ -1,5 +1,5 @@
 // This Mac at a glance: CPU over the last two minutes, memory as Activity Monitor
-// counts it (colored by memory pressure) and battery. One cheap shell call
+// counts it (colored by memory pressure), disk and battery. One cheap shell call
 // per sample; click opens Activity Monitor.
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -66,6 +66,7 @@ export default class MachineVitals extends View {
     const warn = (pct, high = 85) => (pct >= 95 ? t.ansi1 : pct >= high ? t.ansi3 : t.accent);
     const memColor = !s ? t.accent : s.mem.pressure >= 4 ? t.ansi1 : s.mem.pressure >= 2 ? t.ansi3 : t.accent;
     const memPct = s?.mem.total ? (s.mem.used / s.mem.total) * 100 : 0;
+    const diskUsed = s?.disk ? 100 - (s.disk.free / s.disk.total) * 100 : 0;
     const pressureName = { 1: "normal", 2: "warning", 4: "critical" }[s?.mem.pressure] ?? "unknown";
 
     const root = v_flex()
@@ -123,7 +124,8 @@ export default class MachineVitals extends View {
           .child(row("mv-cpu", "CPU", spark, cpu === null ? "…" : `${Math.round(cpu)}%`, cpu === null ? t.dim : warn(cpu) === t.accent ? null : warn(cpu),
             procs ? `Most CPU lately:\n${procs}` : "Most CPU lately: …", (hovered, cx) => { if (hovered) this.loadProcs(cx); }))
           .child(row("mv-mem", "Mem", bar(memPct, memColor), s ? `${gb(s.mem.used)}/${gb(s.mem.total)} GB` : "…", memColor === t.accent ? null : memColor,
-            s ? `Memory pressure ${pressureName}${s.swap ? `, swap used ${gb(s.swap)} GB` : ", no swap"}` : null)),
+            s ? `Memory pressure ${pressureName}${s.swap ? `, swap used ${gb(s.swap)} GB` : ", no swap"}` : null))
+          .child(row("mv-disk", "Disk", bar(diskUsed, warn(diskUsed, 90)), s?.disk ? `${gb(s.disk.free)} GB free` : "…", diskUsed >= 90 ? warn(diskUsed, 90) : null, null)),
       );
   }
 }
