@@ -2,6 +2,7 @@
   // hydln のエディタペイン（Cursor・nvim と揃えた値。書いていないものは既定のまま）
   "font_family": "UDEV Gothic NFLG",
   "font_size": 14,
+  "minimap": true, // 右端のミニマップ（クリック・ドラッグでスクロール）
   "keymap": "sublime", // Sublime Text のキー（エディタの中で動くもの）。起動時に読む
   "folding": false,
   "show_whitespace": true,
