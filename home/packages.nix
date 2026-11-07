@@ -23,6 +23,7 @@
 
     # Editor
     neovim
+    nixd # Nix language server (hydln's and Zed's Nix extension finds it on the PATH)
 
     # Git
     tig
