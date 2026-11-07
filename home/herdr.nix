@@ -16,6 +16,10 @@
 # hydln（~/app/hydln、Herdr のフォーク）のホーム ~/.config/hydln があれば、
 # そこの mods/ にも同じようにコピーする。
 #
+# hydln のエディタペインの設定 editor.json（hydln だけのもの）も、実ファイルへ
+# リンクする（config/hydln/editor.json）。hydln は保存されると読み直す。拡張
+# （~/.config/hydln/editor-data）は hydln が更新・ダウンロードするので管理しない。
+#
 # AGENTS.md・*.d.ts・frame/・icons/・同梱の mod とレイアウト
 # （main / terminals / win98 など）は Herdr が毎回書き直すので管理しない。
 let
@@ -44,7 +48,13 @@ in
 {
   xdg.configFile = lib.genAttrs (map (f: "herdr-app/${f}") files) (name: {
     source = link (lib.removePrefix "herdr-app/" name);
-  });
+  }) // {
+    "hydln/editor.json" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixfiles/config/hydln/editor.json";
+      # 以前からあるふつうのファイル（同じ内容）を置き換える
+      force = true;
+    };
+  };
 
   home.activation.syncHerdrMods = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     mods_dirs="${config.xdg.configHome}/herdr-app/mods"

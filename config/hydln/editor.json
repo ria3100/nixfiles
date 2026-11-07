@@ -1,0 +1,50 @@
+{
+  // hydln のエディタペイン（Cursor・nvim と揃えた値。書いていないものは既定のまま）
+  "font_family": "UDEV Gothic NFLG",
+  "font_size": 14,
+  "keymap": "sublime", // Sublime Text のキー（エディタの中で動くもの）。起動時に読む
+  "folding": false,
+  "show_whitespace": true,
+  "auto_close": false,
+  "format_on_save": true,
+  "insert_final_newline": true,
+
+  // 色（Cursor の Monokai と同じ。背景はアプリのまま）
+  "colors": {
+    "editor": {
+      "text": "#f8f8f2",
+      "line_number": "#75715e", // nvim の行番号の色
+      "active_line": "#3e3d32",
+      "selection": "#878b9180",
+      "cursor": "#f8f8f0",
+      "whitespace": "#3a3a3a", // 空白の「・」（nvim のインデントガイドと同じ薄さ）
+    },
+    "syntax": {
+      "comment": "#88846f",
+      "string": "#e6db74",
+      "string.escape": "#ae81ff",
+      "number": "#ae81ff",
+      "boolean": "#ae81ff",
+      "constant": "#ae81ff",
+      "keyword": "#f92672",
+      "keyword.storage": "#66d9ef",
+      "operator": "#f92672",
+      "function": "#a6e22e",
+      "function.builtin": "#66d9ef",
+      "type": "#a6e22e",
+      "type.builtin": "#66d9ef",
+      "variable": "#f8f8f2",
+      "variable.parameter": "#fd971f",
+      "punctuation": "#f8f8f2",
+      "tag": "#f92672",
+      "attribute": "#a6e22e",
+    },
+  },
+
+  // 言語ごと（LSP の言語 ID）
+  "languages": {
+    "rust": { "tab_size": 4 },
+    "python": { "tab_size": 4 },
+    "go": { "hard_tabs": true, "tab_size": 4 },
+  },
+}

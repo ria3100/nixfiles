@@ -2,17 +2,27 @@
 // { role: "menu", target: { abs, rel, name, dir, on } }. Styled like git-graph's menu.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { props, closeOverlay, notify, theme, run, exec } from "herdr";
+import { props, closeOverlay, notify, theme, run, exec, commands } from "herdr";
 import { openInNvim } from "./nvim.js";
 
 const ICON = name => `mods/file-icons/menu/${name}.svg`;
 const ROW = 30, SEPARATOR = 9, PADDING = 10;
+const ZED = "/Applications/Zed.app/Contents/MacOS/cli";
+
+// hydln opens local files in its editor panes (editor.open); plain Herdr has no such command, so nvim.
+let editor = null;
+const hasEditor = () => editor ??= commands().some(c => c.name === "editor.open");
 
 // As VS Code's Explorer: open (files), the three copies, then the folder actions.
 export function menuItems(target) {
   const folder = target.dir ? target.abs : target.abs.slice(0, target.abs.lastIndexOf("/"));
   return [
-    ...(target.dir ? [] : [{ label: "Open in nvim", icon: "file-text", action: { type: "open" } }, { separator: true }]),
+    ...(target.dir ? [] : !target.on && hasEditor()
+      ? [{ label: "Open in Editor", icon: "file-text", action: { type: "editor" } }]
+      : [{ label: "Open in nvim", icon: "file-text", action: { type: "open" } }]),
+    // Zed runs on this Mac: not for a space on another machine, nor in hydln (its own editor).
+    ...(target.on || hasEditor() ? [] : [{ label: "Open in Zed", icon: "code", action: { type: "zed" } }]),
+    ...(target.dir && (target.on || hasEditor()) ? [] : [{ separator: true }]),
     { label: "Copy Path", icon: "copy", action: { type: "copy", text: target.abs } },
     { label: "Copy Relative Path", icon: "copy", action: { type: "copy", text: target.rel } },
     { label: "Copy Name", icon: "copy", action: { type: "copy", text: target.name } },
@@ -47,6 +57,10 @@ export class Menu {
       notify({ title: "Copied", body: a.text, level: "success", timeout: 2000 });
     } else if (a.type === "reveal") exec("open", ["-R", target.abs]).catch(() => {});
     else if (a.type === "terminal") run("tab.new", { folder: a.folder });
+    // hydln: its editor pane (the one already editing the file, else a new tab).
+    else if (a.type === "editor") run("editor.open", { path: target.abs });
+    // Zed's CLI: a folder as the project; a file opened in the Files panel's folder as the project.
+    else if (a.type === "zed") exec(ZED, target.dir ? [target.abs] : [target.root, target.abs]).catch(() => {});
   }
 
   move(step) {

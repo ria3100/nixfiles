@@ -139,7 +139,7 @@ const CONFIRMING = "tabs-graph.confirming";
 
 // cmd-w, or a tab's close button (`id`; default: the shown tab). A Files nvim quits with
 // `:confirm qall` (it asks about unsaved changes; its tab closes as it exits), a tab of shells
-// doing nothing closes, and anything else running asks first. While nvim or the dialog asks,
+// doing nothing (and hydln's editors with nothing unsaved) closes, and anything else running asks first. While nvim or the dialog asks,
 // closing that tab again does nothing.
 async function closeTab(quitting, id = null) {
   const space = spaces().find(s => s.active), tab = space?.tabs.find(t => id ? t.id === id : t.active);
@@ -157,6 +157,8 @@ async function closeTab(quitting, id = null) {
   }
   const running = [];
   for (const pane of inTab) {
+    // hydln: an editor pane with nothing unsaved closes as it is.
+    if (pane.editor) { if (pane.editor.dirty) running.push(`${pane.title} (unsaved)`); continue; }
     if (!pane.terminal) { running.push(pane.title || pane.mod || "mod"); continue; }
     const got = await hc(["get", pane.terminal]).catch(() => null);
     const info = got?.code === 0 ? JSON.parse(got.stdout) : null;
