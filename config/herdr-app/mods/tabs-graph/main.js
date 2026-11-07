@@ -64,7 +64,7 @@ export default class Tabs extends View {
     const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
     const item = (c, i) => {
-      const { name, program, command, preview } = tabName(c);
+      const { name, program, command, preview, dirty } = tabName(c);
       return h_flex().id(`tab-${c.id}`).h(29).px(10).gap(7).rounded(7).items_center().flex_none().text_size(12.8)
         .border(1).border_color(c.active ? t.border : t.chrome).bg(c.active ? t.raised : t.chrome).text_color(c.active ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover))
@@ -77,6 +77,7 @@ export default class Tabs extends View {
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "menu", kind: "popup", width: 200, props: { tab: "tab", target: { id: c.id, space: space.id } } }); })
         .when(Boolean(program?.icon) && !command, el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
         .child(div().max_w(170).truncate().when(preview, el => el.font_family(".SystemUIFont").italic()).child(c.zoomed ? `${name} Z` : name))
+        .when(dirty, el => el.child(div().size(7).flex_none().rounded(4).bg(c.active ? t.foreground : t.muted)))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
         .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
         .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); closeTab(this.quitting, c.id).catch(() => {}); }).child(svg("mods/pane/close.svg").size(12))));
@@ -123,7 +124,11 @@ function tabName(c) {
   // italics, in the system font since the UI font (Geist) has no italic face.
   const title = inTab.length === 1 && filesId(inTab[0]) ? inTab[0].title : null;
   const preview = Boolean(title?.startsWith(PREVIEW)), files = preview ? title.slice(PREVIEW.length) : title;
-  return { name: c.named ? c.name : files || (command ?? program?.name ?? c.name), program, command, preview: preview && !c.named };
+  // hydln: a tab whose only pane is an editor's preview is in italics too; one with unsaved changes in
+  // an editor gets a dot after its name.
+  const editorPreview = inTab.length === 1 && Boolean(inTab[0].editor?.preview);
+  const dirty = inTab.some(p => p.editor?.dirty);
+  return { name: c.named ? c.name : files || (command ?? program?.name ?? c.name), program, command, preview: (preview && !c.named) || editorPreview, dirty };
 }
 
 // The command a shell was started to run with -c, e.g. "nvim" from `zsh -l -c "nvim 'a.nix'; exec zsh -l"`.
