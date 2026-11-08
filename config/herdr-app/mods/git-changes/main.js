@@ -1,20 +1,22 @@
 // VS Code's Source Control "Changes" for the focused pane's repository: changed files in
 // Merge Changes / Staged Changes / Changes, each with its Material Icon Theme icon (borrowed
-// from the file-icons mod), name, folder and status letter. A click opens the file in nvim as
-// the Files panel does (file-icons/nvim.js: a preview tab, kept on a double-click) and shows its
-// diff with fugitive: a staged file as the index against HEAD, an unstaged one as the working
-// file against the index. The focused nvim's file is marked.
+// from the file-icons mod), name, folder and status letter. In hydln a click opens the file in an
+// editor pane with its changes since HEAD shown in the text, as a preview the next click replaces
+// (a double-click keeps it), as the Files panel does; the focused editor's file is marked. A
+// deleted file, another machine's, or plain Herdr (no editor): nothing opens.
 import { View, div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { exec, watchFolder, theme, settings } from "herdr";
+import { exec, watchFolder, theme, settings, run, commands, focused, panes } from "herdr";
 import ICONS from "./icons.js";
-import { openInNvim, focusedNvim, nvimFile } from "./nvim.js";
 import { location, placeKey as key } from "./location.js";
 
 const ICON_DIR = "mods/file-icons";
 const LIMIT = 2000;
 
-const vimString = text => `'${text.replaceAll("'", "''")}'`;
+// hydln opens files in its editor panes (editor.open); plain Herdr has no such command.
+let editor = null;
+// Remembered once seen: right after the app starts, commands() may not list it yet.
+const hasEditor = () => editor ||= commands().some(c => c.name === "editor.open");
 // Reads write nothing under .git (no index lock, no fsmonitor cookie): the folder watch would see it.
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false"];
 
@@ -48,19 +50,6 @@ function parseStatus(out) {
     { id: "staged", title: "Staged Changes", files: staged.sort(byPath) },
     { id: "changes", title: "Changes", files: changes.sort(byPath) },
   ].filter(g => g.files.length);
-}
-
-// The Ex commands that show a change once its file is open in the current window.
-function diffCommands(file) {
-  const load = "silent! Lazy load vim-fugitive";
-  const edit = object => `exe 'Gedit ' . fnameescape(${vimString(object)})`;
-  if (file.group === "staged") {
-    if (file.letter === "A") return [load, edit(`:${file.path}`)];
-    if (file.letter === "D") return [load, edit(`HEAD:${file.path}`)];
-    return [load, edit(`:${file.path}`), "Gvdiffsplit HEAD"];
-  }
-  if (file.group === "changes") return file.letter === "D" ? [load, edit(`:${file.path}`)] : [load, "Gvdiffsplit"];
-  return [];
 }
 
 export default class GitChanges extends View {
@@ -108,24 +97,15 @@ export default class GitChanges extends View {
   }
 
   // A click opens the preview; a double-click (its second click) keeps the tab.
-  open(file, pin, cx) {
-    const top = this.top, on = this.on;
-    cx.spawn(async () => { await openInNvim(`${top}/${file.path}`, { on, folder: top, pin, commands: diffCommands(file) }); });
+  open(file, pin) {
+    if (this.on || !hasEditor() || file.letter === "D") return;
+    run("editor.open", { path: `${this.top}/${file.path}`, preview: !pin, diff: true });
   }
 
-  // Marks the focused Files nvim's file, again when it moves to another file.
-  follow(cx) {
-    const nvim = focusedNvim(), seen = nvim ? `${nvim.seen}\0${this.context}` : null;
-    if (seen === this.following) return;
-    this.following = seen;
-    if (!nvim) { this.selected = null; return; }
-    const on = this.on;
-    cx.spawn(async cx => {
-      const file = await nvimFile(nvim.id, on);
-      if (this.following !== seen) return;
-      this.selected = file;
-      cx.notify();
-    });
+  // Marks the focused editor's file (`editor.path` in panes()). Called while drawing.
+  follow() {
+    const f = focused(), pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
+    this.selected = pane?.editor?.path ?? null;
   }
 
   row(file, t, dark) {
@@ -133,7 +113,7 @@ export default class GitChanges extends View {
     const color = file.letter === "A" || file.letter === "U" ? t.ansi2 : file.letter === "D" || file.letter === "!" ? t.ansi1 : t.blocked;
     return h_flex().id(`change-${file.group}-${file.path}`).h(26).flex_none().pl(14).pr(8).gap(7).items_center().rounded(7).cursor_pointer()
       .when(`${this.top}/${file.path}` === this.selected, el => el.bg(t.selected)).hover(s => s.bg(t.hover))
-      .on_click((e, cx) => this.open(file, e.click_count >= 2, cx))
+      .on_click((e) => this.open(file, e.click_count >= 2))
       .child(image(icon(file.path, dark)).size(16).flex_none())
       .child(h_flex().flex_1().min_w(0).gap(6).items_center()
         .child(div().flex_none().max_w_full().truncate().child(name))
@@ -143,7 +123,7 @@ export default class GitChanges extends View {
 
   render(cx) {
     if (key() !== this.context) this.refresh(cx);
-    this.follow(cx);
+    this.follow();
     const t = theme(), dark = Boolean(settings().dark);
     const total = this.groups.reduce((n, g) => n + g.files.length, 0);
     const list = [];

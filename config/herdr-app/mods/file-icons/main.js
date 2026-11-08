@@ -18,7 +18,8 @@ import { Menu, menuItems, menuHeight } from "./menu.js";
 
 // hydln opens local files in its editor panes (editor.open); plain Herdr has no such command.
 let editor = null;
-const hasEditor = () => editor ??= commands().some(c => c.name === "editor.open");
+// Remembered once seen: right after the app starts, commands() may not list it yet.
+const hasEditor = () => editor ||= commands().some(c => c.name === "editor.open");
 
 // One mod, two roles: the panel, and over the window its right-click menu (props.role "menu").
 

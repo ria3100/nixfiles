@@ -11,7 +11,8 @@ const ZED = "/Applications/Zed.app/Contents/MacOS/cli";
 
 // hydln opens local files in its editor panes (editor.open); plain Herdr has no such command, so nvim.
 let editor = null;
-const hasEditor = () => editor ??= commands().some(c => c.name === "editor.open");
+// Remembered once seen: right after the app starts, commands() may not list it yet.
+const hasEditor = () => editor ||= commands().some(c => c.name === "editor.open");
 
 // As VS Code's Explorer: open (files), the three copies, then the folder actions.
 export function menuItems(target) {

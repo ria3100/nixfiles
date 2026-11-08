@@ -68,9 +68,5 @@
     "cmd-left": "send:\u0001",
     "cmd-right": "send:\u0005",
     "cmd-backspace": "send:\u0015"
-  },
-  "mod:editor": {
-    "cmd-s": "editor.save",
-    "cmd-w": "editor.close"
   }
 }
