@@ -35,7 +35,7 @@ let
 
   mods = [
     "clock"
-    "tabs-graph"
+    "tab-bar"
     "git-graph"
     "file-icons"
     "git-changes"

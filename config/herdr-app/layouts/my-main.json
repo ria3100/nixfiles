@@ -102,7 +102,7 @@
           "id": "tabs",
           "type": "block",
           "content": {
-            "mod": "tabs-graph"
+            "mod": "tab-bar"
           },
           "size": {
             "px": 42

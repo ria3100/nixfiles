@@ -1,12 +1,12 @@
 // Everything Herdr does with nvim, so nvim's own config knows nothing of Herdr. Used by the Files
-// panel and its menu, the Changes panel (git-changes) and tabs-graph (tab names, cmd-w).
+// panel and its menu, the Changes panel (git-changes) and tab-bar (tab names, cmd-w).
 //
 // As VS Code's editor tabs: each file opens in a Herdr tab of its own running nvim, and the tab
 // nobody has edited yet (the preview) is reused for the next file; a double-click keeps (pins) it.
 // These "Files nvims" are started with --listen on ${TMPDIR:-/tmp}/herdr-files-<id>.sock (their
 // terminal's argv carries the id) and with SETUP: a "folder/file" title for the tab name, and
 // g:herdr_edited once anything was changed, which keeps the tab. Until then the title starts with
-// PREVIEW, an invisible mark tabs-graph shows as italics. The tab closes when nvim exits.
+// PREVIEW, an invisible mark tab-bar shows as italics. The tab closes when nvim exits.
 import { spaces, panes, focused, terminals, exec, run } from "herdr";
 
 export const PREVIEW = "\u200b";

@@ -18,7 +18,7 @@ export default class Tabs extends View {
     this.pressed = null;
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
     this.quitting = new Set();
-    // cmd-w (keys.json: "tabs-graph.close").
+    // cmd-w (keys.json: "tab-bar.close").
     cx.spawn(async () => { for (;;) if (await nextCommand() === "close") closeTab(this.quitting).catch(() => {}); });
   }
 
@@ -108,9 +108,9 @@ export default class Tabs extends View {
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
       .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
       .child(panelButton("graph", "Git", "mods/git-graph/icons/graph.svg"))
-      .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs-graph/win-min.svg").size(16) : "−", () => run("window.minimize")))
-        .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs-graph/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
-        .child(button("close-window", w.platform === "windows" ? svg("mods/tabs-graph/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));
+      .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tab-bar/win-min.svg").size(16) : "−", () => run("window.minimize")))
+        .child(button("maximize", w.platform === "windows" ? svg(`mods/tab-bar/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
+        .child(button("close-window", w.platform === "windows" ? svg("mods/tab-bar/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));
   }
 }
 
@@ -140,11 +140,11 @@ function launched(pane) {
   return base && !/^(\w*sh|exec)$/.test(base) ? base : null;
 }
 
-const CONFIRMING = "tabs-graph.confirming";
+const CONFIRMING = "tab-bar.confirming";
 
 // cmd-w, or a tab's close button (`id`; default: the shown tab). A Files nvim quits with
 // `:confirm qall` (it asks about unsaved changes; its tab closes as it exits), a tab of shells
-// doing nothing (and hydln's editors with nothing unsaved) closes, and anything else running asks first. While nvim or the dialog asks,
+// doing nothing (and hydln's web panes and editors with nothing unsaved) closes, and anything else running asks first. While nvim or the dialog asks,
 // closing that tab again does nothing.
 async function closeTab(quitting, id = null) {
   const space = spaces().find(s => s.active), tab = space?.tabs.find(t => id ? t.id === id : t.active);
@@ -164,6 +164,8 @@ async function closeTab(quitting, id = null) {
   for (const pane of inTab) {
     // hydln: an editor pane with nothing unsaved closes as it is.
     if (pane.editor) { if (pane.editor.dirty) running.push(`${pane.title} (unsaved)`); continue; }
+    // hydln: a web pane (a GitHub issue opened from github-issues, ...) closes as it is.
+    if (pane.web) continue;
     if (!pane.terminal) { running.push(pane.title || pane.mod || "mod"); continue; }
     const got = await hc(["get", pane.terminal]).catch(() => null);
     const info = got?.code === 0 ? JSON.parse(got.stdout) : null;
@@ -172,7 +174,7 @@ async function closeTab(quitting, id = null) {
   }
   if (!running.length) { run("tab.close", { id: tab.id }); return; }
   setShared(CONFIRMING, { tab: tab.id, at: Date.now() });
-  openOverlay({ mod: "tabs-graph", kind: "dialog", modal: true, width: 380, height: 160,
+  openOverlay({ mod: "tab-bar", kind: "dialog", modal: true, width: 380, height: 160,
     props: { role: "confirm", tab: tab.id, name: tabName(tab).name, running: [...new Set(running)] } });
 }
 
