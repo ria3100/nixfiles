@@ -5,17 +5,15 @@
     enable = true;
     enableDefaultConfig = false;
 
-    matchBlocks = {
+    settings = {
       "github.com" = {
-        identityFile = "~/.ssh/id_ed25519_github";
-        user = "git";
+        IdentityFile = "~/.ssh/id_ed25519_github";
+        User = "git";
       };
       "*" = {
-        extraOptions = {
-          UseKeychain = "yes";
-          AddKeysToAgent = "yes";
-          IdentitiesOnly = "yes";
-        };
+        UseKeychain = "yes";
+        AddKeysToAgent = "yes";
+        IdentitiesOnly = "yes";
       };
     };
   };
