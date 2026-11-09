@@ -185,6 +185,16 @@
                       "content": {
                         "mod": "git-graph"
                       }
+                    },
+                    {
+                      "id": "issues",
+                      "type": "block",
+                      "content": {
+                        "mod": "github-issues",
+                        "props": {
+                          "panel": true
+                        }
+                      }
                     }
                   ],
                   "active": "files"

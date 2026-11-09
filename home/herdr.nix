@@ -43,6 +43,7 @@ let
     "claude-status"
     "dev-ports"
     "spaces-ports"
+    "github-issues"
   ];
 in
 {
