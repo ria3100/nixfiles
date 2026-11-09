@@ -124,6 +124,14 @@
             },
             "fn_function_keys": [
                 {
+                    "from": { "key_code": "f1" },
+                    "to": [{ "shell_command": "~/.local/bin/display-brightness down" }]
+                },
+                {
+                    "from": { "key_code": "f2" },
+                    "to": [{ "shell_command": "~/.local/bin/display-brightness up" }]
+                },
+                {
                     "from": { "key_code": "f3" },
                     "to": [{ "key_code": "mission_control" }]
                 },

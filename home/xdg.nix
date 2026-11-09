@@ -50,4 +50,16 @@
       install -m 644 ${../config/cursor/settings.json} "$target"
     fi
   '';
+
+  # Karabiner の F1 / F2 から呼ぶ明るさ調整コマンド（config/karabiner/brightness.swift）。
+  # Command Line Tools の swiftc でビルドし、ソースが変わったときだけビルドし直す。
+  home.activation.buildDisplayBrightness = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    src=${../config/karabiner/brightness.swift}
+    out="$HOME/.local/bin/display-brightness"
+    if [ ! -x "$out" ] || [ "$(cat "$out.src" 2>/dev/null)" != "$src" ]; then
+      run mkdir -p "$HOME/.local/bin"
+      run /usr/bin/swiftc -O "$src" -o "$out"
+      run sh -c 'echo "$1" > "$2"' sh "$src" "$out.src"
+    fi
+  '';
 }
