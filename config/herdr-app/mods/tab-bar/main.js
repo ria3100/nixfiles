@@ -1,7 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { spaces, panes, run, openOverlay, closeOverlay, theme, window, shared, setShared, layout, settings, terminals, nextCommand, props, hc } from "herdr";
-import { filesId, quitNvim, PREVIEW } from "./nvim.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -17,9 +16,8 @@ export default class Tabs extends View {
     if (props()?.role === "confirm") { this.confirm = new Confirm(); this.confirm.init(cx); return; }
     this.pressed = null;
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
-    this.quitting = new Set();
     // cmd-w (keys.json: "tab-bar.close").
-    cx.spawn(async () => { for (;;) if (await nextCommand() === "close") closeTab(this.quitting).catch(() => {}); });
+    cx.spawn(async () => { for (;;) if (await nextCommand() === "close") closeTab().catch(() => {}); });
   }
 
   // The side panel is remembered per space: switching shows that space's choice
@@ -80,7 +78,7 @@ export default class Tabs extends View {
         .when(dirty, el => el.child(div().size(7).flex_none().rounded(4).bg(c.active ? t.foreground : t.muted)))
         .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
         .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
-        .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); closeTab(this.quitting, c.id).catch(() => {}); }).child(svg("mods/pane/close.svg").size(12))));
+        .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); closeTab(c.id).catch(() => {}); }).child(svg("mods/pane/close.svg").size(12))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();
     // Old saved rails and a dragged-narrow sidebar can be smaller than the window buttons.
@@ -118,20 +116,16 @@ export default class Tabs extends View {
 function tabName(c) {
   const inTab = panes().filter(p => p.tab === c.id);
   const program = (inTab.find(p => p.program?.agent) ?? inTab.find(p => p.program && p.program.key !== "shell") ?? inTab[0])?.program;
-  // A shell started as `zsh -c "nvim file; exec zsh"` (git-changes' open in editor) shows as the shell: name the command instead.
+  // A shell started as `zsh -c "<command>; exec zsh"` shows as the shell: name the command instead.
   const command = program?.key === "shell" ? launched(inTab.find(p => p.program === program)) : null;
-  // A Files nvim (file-icons/nvim.js) titles itself "folder/file", marked while it is a preview: shown in
-  // italics, in the system font since the UI font (Geist) has no italic face.
-  const title = inTab.length === 1 && filesId(inTab[0]) ? inTab[0].title : null;
-  const preview = Boolean(title?.startsWith(PREVIEW)), files = preview ? title.slice(PREVIEW.length) : title;
-  // hydln: a tab whose only pane is an editor's preview is in italics too; one with unsaved changes in
-  // an editor gets a dot after its name.
-  const editorPreview = inTab.length === 1 && Boolean(inTab[0].editor?.preview);
+  // hydln: a tab whose only pane is an editor's preview is in italics (in the system font, since the
+  // UI font, Geist, has no italic face); one with unsaved changes in an editor gets a dot after its name.
+  const preview = inTab.length === 1 && Boolean(inTab[0].editor?.preview);
   const dirty = inTab.some(p => p.editor?.dirty);
-  return { name: c.named ? c.name : files || (command ?? program?.name ?? c.name), program, command, preview: (preview && !c.named) || editorPreview, dirty };
+  return { name: c.named ? c.name : command ?? program?.name ?? c.name, program, command, preview, dirty };
 }
 
-// The command a shell was started to run with -c, e.g. "nvim" from `zsh -l -c "nvim 'a.nix'; exec zsh -l"`.
+// The command a shell was started to run with -c, e.g. "lazygit" from `zsh -l -c "lazygit; exec zsh -l"`.
 function launched(pane) {
   const argv = terminals().find(t => t.address === pane?.terminal)?.argv ?? [];
   const i = argv.lastIndexOf("-c");
@@ -142,24 +136,15 @@ function launched(pane) {
 
 const CONFIRMING = "tab-bar.confirming";
 
-// cmd-w, or a tab's close button (`id`; default: the shown tab). A Files nvim quits with
-// `:confirm qall` (it asks about unsaved changes; its tab closes as it exits), a tab of shells
-// doing nothing (and hydln's web panes and editors with nothing unsaved) closes, and anything else running asks first. While nvim or the dialog asks,
-// closing that tab again does nothing.
-async function closeTab(quitting, id = null) {
+// cmd-w, or a tab's close button (`id`; default: the shown tab). A tab of shells doing nothing
+// (and hydln's web panes and editors with nothing unsaved) closes, and anything else running asks
+// first. While the dialog asks, closing that tab again does nothing.
+async function closeTab(id = null) {
   const space = spaces().find(s => s.active), tab = space?.tabs.find(t => id ? t.id === id : t.active);
-  if (!tab || quitting.has(tab.id)) return;
+  if (!tab) return;
   const asking = shared(CONFIRMING);
   if (asking?.tab === tab.id && Date.now() - asking.at < 60000) return;
   const inTab = panes().filter(p => p.tab === tab.id);
-  const nvim = inTab.length === 1 ? filesId(inTab[0]) : null;
-  if (nvim) {
-    quitting.add(tab.id);
-    // nvim asks inside its tab: show it.
-    if (!tab.active) run("tab.select", { id: tab.id });
-    try { if (await quitNvim(nvim, space.machine ?? null)) return; }
-    finally { quitting.delete(tab.id); }
-  }
   const running = [];
   for (const pane of inTab) {
     // hydln: an editor pane with nothing unsaved closes as it is.

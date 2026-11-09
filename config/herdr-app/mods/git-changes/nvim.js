@@ -1,1 +1,0 @@
-../file-icons/nvim.js

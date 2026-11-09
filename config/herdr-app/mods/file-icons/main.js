@@ -1,18 +1,17 @@
 // Herdr's Files panel with VS Code's Material Icon Theme icons: a lazy file browser for the
-// focused pane's folder. A click opens the file in nvim, as a preview tab, and a double-click keeps
-// that tab (nvim.js); focusing such a tab opens the folders down to its file and marks its row.
+// focused pane's folder. In hydln a click opens a local file in an editor pane, as a preview, and a
+// double-click keeps it; focusing an editor pane opens the folders down to its file and marks its row.
+// Elsewhere (plain Herdr, a space on another machine) a click opens nothing.
 // Changed files and the folders above them take their git status color, and a right-click opens
 // a menu (menu.js) of copies and folder actions. Files git ignores are dimmed.
 //
 // Modified from Herdr's shipped `files` mod (https://github.com/herdrdev/herdr-app, Apache-2.0):
-// added DIR, icon() and the Material Icon Theme icons, nvim (nvim.js) in place of the read-only
-// preview, following the focused nvim, the status colors and the menu. In hydln, local files open
-// in its editor panes (editor.open, the same preview and keep) instead of nvim.
+// added DIR, icon() and the Material Icon Theme icons, hydln's editor panes (editor.open) in place
+// of the read-only preview, following the focused editor, the status colors and the menu.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { exec, props, openOverlay, watchFolder, theme, settings, window, commands, run, focused, panes } from "herdr";
 import ICONS from "./icons.js";
-import { openInNvim, focusedNvim, nvimFile } from "./nvim.js";
 import { location, placeKey as key } from "./location.js";
 import { Menu, menuItems, menuHeight } from "./menu.js";
 
@@ -156,44 +155,25 @@ export default class Files extends View {
     });
   }
 
-  // The focused pane is a Files nvim: open the folders down to its file and mark it. Again when
-  // its title (folder/file) changes, i.e. nvim moved to another file, or the panel's place does.
+  // The focused pane is a hydln editor (`editor.path` in panes()): open the folders down to its
+  // file and mark it. Again when it moves to another file, or the panel's place changes.
   follow(cx) {
-    // hydln: an editor pane gives its file (`editor.path` in panes()).
     const f = focused(), pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
     const edited = pane?.editor?.path ?? null;
-    if (edited) {
-      const seen = `editor\0${edited}\0${this.context}`;
-      if (seen === this.following) return;
-      this.following = seen;
-      if (!this.root || !edited.startsWith(this.root + "/")) { this.selected = null; return; }
-      const rel = edited.slice(this.root.length + 1), parts = rel.split("/");
-      for (let i = 1; i < parts.length; i++) this.expand(parts.slice(0, i).join("/"), cx);
-      this.selected = rel;
-      return;
-    }
-    const nvim = focusedNvim(), seen = nvim ? `${nvim.seen}\0${this.context}` : null;
+    const seen = edited ? `editor\0${edited}\0${this.context}` : null;
     if (seen === this.following) return;
     this.following = seen;
-    if (!nvim) { this.selected = null; return; }
-    const on = this.on;
-    cx.spawn(async cx => {
-      const file = await nvimFile(nvim.id, on);
-      if (this.following !== seen || !file || !this.root || !file.startsWith(this.root + "/")) return;
-      const rel = file.slice(this.root.length + 1), parts = rel.split("/");
-      for (let i = 1; i < parts.length; i++) this.expand(parts.slice(0, i).join("/"), cx);
-      this.selected = rel;
-      cx.notify();
-    });
+    if (!edited || !this.root || !edited.startsWith(this.root + "/")) { this.selected = null; return; }
+    const rel = edited.slice(this.root.length + 1), parts = rel.split("/");
+    for (let i = 1; i < parts.length; i++) this.expand(parts.slice(0, i).join("/"), cx);
+    this.selected = rel;
   }
 
-  // A click opens the preview; a double-click (its second click) keeps the tab.
-  openInNvim(path, pin, cx) {
-    const file = `${this.root}/${path}`, on = this.on, folder = this.root;
-    // hydln: a local file goes to an editor pane, as a preview the next click replaces; a
-    // double-click (or an edit) keeps it.
-    if (!on && hasEditor()) { run("editor.open", { path: file, preview: !pin }); return; }
-    cx.spawn(async () => { await openInNvim(file, { on, folder, pin }); });
+  // hydln: a local file goes to an editor pane, as a preview the next click replaces; a
+  // double-click (its second click, or an edit) keeps it. Elsewhere nothing opens.
+  openFile(path, pin) {
+    if (this.on || !hasEditor()) return;
+    run("editor.open", { path: `${this.root}/${path}`, preview: !pin });
   }
 
   // Paths relative to the repository root when there is one (as VS Code's workspace), else to the panel's folder.
@@ -228,7 +208,7 @@ export default class Files extends View {
       const ignored = !mark && this.isIgnored(abs);
       const markColor = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : t.blocked;
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().when(path === this.selected, el => el.bg(t.selected)).hover(s => s.bg(t.hover))
-        .on_click((e, cx) => entry.dir ? this.toggle(path, cx) : this.openInNvim(path, e.click_count >= 2, cx))
+        .on_click((e, cx) => entry.dir ? this.toggle(path, cx) : this.openFile(path, e.click_count >= 2))
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openMenu(path, entry); })
         .child(entry.dir ? svg(`${DIR}/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(image(icon(path, entry.dir, open, dark)).size(16).flex_none().when(ignored, el => el.opacity(0.6)))
