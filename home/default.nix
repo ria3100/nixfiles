@@ -11,6 +11,7 @@
     ./herdr-browser.nix
     ./zed.nix
     ./idle-dim.nix
+    ./key-taps.nix
   ];
 
   home.stateVersion = "25.05";
