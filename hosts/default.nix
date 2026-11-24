@@ -19,6 +19,7 @@
     };
 
     casks = [
+      "antigravity-cli"
       "chatgpt"
       "claude-code"
       "codex"
