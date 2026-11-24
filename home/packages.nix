@@ -42,6 +42,7 @@
 
     # Infra
     cloudflared
+    google-cloud-sdk
   ];
 
   home.activation.installGlobalNpmPackages = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
