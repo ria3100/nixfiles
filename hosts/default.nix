@@ -30,6 +30,7 @@
       "ghostty"
       "google-chrome"
       "herdr-app"
+      "hermes-desktop"
       "azookey"
       "karabiner-elements"
       "nani"

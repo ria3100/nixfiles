@@ -41,6 +41,13 @@ in
       [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
     '';
 
+    # ログインシェル（.zprofile）にも ~/.local/bin を通す。Hermes のインストーラは .zprofile に
+    # ~/.local/bin を足す PATH 行がないと追記しようとし、nix のリンクで書き込めずに失敗する。
+    # 重複は envExtra の typeset -U path で消える
+    profileExtra = ''
+      export PATH="$HOME/.local/bin:$PATH"
+    '';
+
     initContent = lib.mkMerge [
       (lib.mkOrder 2000 ''
         if [[ $TERM != "dumb" ]]; then
