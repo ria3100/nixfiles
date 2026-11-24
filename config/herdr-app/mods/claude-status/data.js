@@ -82,3 +82,19 @@ export function shortPath(path, home, keep = 2) {
 
 // A terminal address that is safe as a file name (the status line script uses the same rule).
 export const safeId = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+
+// The Gemini limits from `agy -p /usage --output-format json`, in the shape of
+// Claude Code's rate_limits so windowState reads both. agy gives what is left
+// (remaining_fraction) and an ISO reset time per bucket; a window not started yet
+// reports a reset time 5 hours (or 7 days) from now.
+export function agyLimits(usage) {
+  const group = usage?.command?.data?.groups?.find((g) => g.buckets?.some((b) => b.id?.startsWith("gemini-")));
+  const limits = {};
+  for (const b of group?.buckets ?? []) {
+    const key = b.window === "5h" ? "five_hour" : b.window === "weekly" ? "seven_day" : null;
+    const at = Date.parse(b.reset_time) / 1000;
+    if (!key || typeof b.remaining_fraction !== "number" || !Number.isFinite(at)) continue;
+    limits[key] = { used_percentage: Math.max(0, (1 - b.remaining_fraction) * 100), resets_at: at };
+  }
+  return limits;
+}
